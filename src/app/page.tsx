@@ -50,13 +50,27 @@ const FEATURES = [
     color: 'text-accent',
     bg: 'bg-accent/10',
   },
+  {
+    title: 'Presentations',
+    desc: 'Create beautiful slide decks with 12 styles, real images, and multiple layouts — like Gamma, but free.',
+    icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+    color: 'text-warning',
+    bg: 'bg-warning/10',
+  },
+  {
+    title: 'History & Tracking',
+    desc: 'All your essays and presentations saved in one place. Track streaks, progress, and study activity.',
+    icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    color: 'text-success',
+    bg: 'bg-success/10',
+  },
 ];
 
 const STATS = [
   { label: 'AI Models', value: '6+' },
   { label: 'Themes', value: '11' },
-  { label: 'File Types', value: 'PDF, TXT, IMG' },
-  { label: 'Languages', value: '8' },
+  { label: 'Essay Types', value: '15' },
+  { label: 'Languages', value: '12' },
 ];
 
 export default function Home() {
@@ -179,7 +193,7 @@ export default function Home() {
         <h2 className="mb-6 text-center text-2xl font-bold text-text-primary">
           Everything You Need to <span className="gradient-text">Study Smarter</span>
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((feature, i) => (
             <motion.div
               key={feature.title}
@@ -209,13 +223,33 @@ export default function Home() {
         className="my-12 text-center"
       >
         <p className="mb-4 text-text-muted">Works with Claude, OpenAI, Gemini, Kimi, and local models via Ollama</p>
-        <Link
-          href="/onboarding"
-          className="inline-block rounded-xl bg-accent px-10 py-3.5 text-base font-bold text-white transition-all hover:bg-accent-hover hover:scale-[1.03] active:scale-[0.98]"
-        >
-          Start Studying Now
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <Link
+            href="/onboarding"
+            className="inline-block rounded-xl bg-accent px-10 py-3.5 text-base font-bold text-white transition-all hover:bg-accent-hover hover:scale-[1.03] active:scale-[0.98]"
+          >
+            Start Studying Now
+          </Link>
+          <Link
+            href="/pricing"
+            className="inline-block rounded-xl border border-border px-8 py-3.5 text-base font-medium text-text-secondary transition-all hover:bg-bg-hover hover:text-text-primary"
+          >
+            View Pricing
+          </Link>
+        </div>
       </motion.div>
+
+      {/* Footer */}
+      <footer className="mt-8 mb-4 border-t border-border pt-6">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+          <p className="text-xs text-text-muted">&copy; {new Date().getFullYear()} CDL Study Tool. Built by Arthur.</p>
+          <div className="flex gap-6">
+            <Link href="/pricing" className="text-xs text-text-muted hover:text-text-primary transition-colors">Pricing</Link>
+            <Link href="/setup" className="text-xs text-text-muted hover:text-text-primary transition-colors">Setup</Link>
+            <Link href="/login" className="text-xs text-text-muted hover:text-text-primary transition-colors">Login</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
