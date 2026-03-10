@@ -6,6 +6,7 @@ import { useAIProvider } from '@/hooks/useAIProvider';
 import { useStyleProfile } from '@/hooks/useStyleProfile';
 import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getItem, setItem } from '@/lib/storage/localStorage';
 import { toast } from 'sonner';
 
 type SlideLayout = 'title' | 'content' | 'image_text' | 'comparison' | 'quote' | 'section' | 'timeline' | 'stats' | 'steps';
@@ -296,6 +297,19 @@ export default function PresentPage() {
         });
         await Promise.all(imagePromises);
       }
+
+      // Save to history
+      const saved = getItem<{ id: string; title: string; slideCount: number; format: string; style: string; createdAt: string }[]>('generated_presentations', []);
+      saved.push({
+        id: crypto.randomUUID(),
+        title: parsed.title,
+        slideCount: parsed.slides.length,
+        format,
+        style,
+        createdAt: new Date().toISOString(),
+      });
+      setItem('generated_presentations', saved);
+      setItem('last_active_date', new Date().toISOString().slice(0, 10));
 
       setPresentation(parsed);
       setCurrentSlide(0);

@@ -8,8 +8,10 @@ import { useEssays } from '@/hooks/useEssays';
 import { useAIProvider } from '@/hooks/useAIProvider';
 import { getItem } from '@/lib/storage/localStorage';
 import { getConfidenceColor, getRecommendation } from '@/lib/analysis/confidence';
+import { getDayStreak, getWeeklyActivity, recordActivity } from '@/lib/streak';
 import { PROVIDERS } from '@/types/ai';
 import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
+import { WeeklyActivityChart } from '@/components/ui/MiniChart';
 import type { GeneratedEssay } from '@/types/essay';
 
 const ACTION_COLORS = [
@@ -27,10 +29,15 @@ export default function DashboardPage() {
   const { activeProvider } = useAIProvider();
   const [generated, setGenerated] = useState<GeneratedEssay[]>([]);
   const [learningStats, setLearningStats] = useState({ essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 });
+  const [dayStreak, setDayStreak] = useState(0);
+  const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
 
   useEffect(() => {
+    recordActivity(); // Track visit
     setGenerated(getItem<GeneratedEssay[]>('generated_essays', []));
     setLearningStats(getItem('learning_stats', { essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 }));
+    setDayStreak(getDayStreak());
+    setWeeklyActivity(getWeeklyActivity());
   }, []);
 
   const analyzedCount = essays.filter((e) => e.status === 'analyzed').length;
@@ -54,6 +61,7 @@ export default function DashboardPage() {
     { label: 'Practice', href: '/exercises', icon: 'M13 10V3L4 14h7v7l9-11h-7z', desc: 'Interactive exercises for weak spots' },
     { label: 'Record Lecture', href: '/record', icon: 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z', desc: 'Record and analyze a lecture' },
     { label: 'Presentations', href: '/present', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z', desc: 'Create styled presentations' },
+    { label: 'History', href: '/history', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', desc: 'View all past work' },
   ];
 
   const displayEssays = generated.length > 0 ? generated.slice(-5).reverse() : null;
@@ -111,7 +119,7 @@ export default function DashboardPage() {
         {[
           { label: 'Essays Graded', value: learningStats.essaysGraded, color: 'text-accent' },
           { label: 'Exercises Done', value: learningStats.exercisesDone, color: 'text-success' },
-          { label: 'Day Streak', value: learningStats.streak, color: 'text-warning' },
+          { label: 'Day Streak', value: dayStreak, color: 'text-warning' },
           { label: 'Lectures Recorded', value: learningStats.lecturesRecorded, color: 'text-accent-secondary' },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-border bg-bg-card p-4" style={{ boxShadow: 'var(--card-shadow)' }}>
@@ -119,6 +127,12 @@ export default function DashboardPage() {
             <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Weekly Activity */}
+      <div className="mb-8 rounded-xl border border-border bg-bg-card p-5" style={{ boxShadow: 'var(--card-shadow)' }}>
+        <h2 className="text-sm font-semibold text-text-primary mb-3">This Week</h2>
+        <WeeklyActivityChart data={weeklyActivity} />
       </div>
 
       {/* Quick Actions */}

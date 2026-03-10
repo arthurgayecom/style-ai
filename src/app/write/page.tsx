@@ -10,6 +10,8 @@ import {
   HUMANIZATION_LEVELS, LANGUAGES,
   type EssayType,
 } from '@/types/essay';
+import type { GeneratedEssay } from '@/types/essay';
+import { getItem, setItem } from '@/lib/storage/localStorage';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
@@ -96,6 +98,22 @@ export default function WritePage() {
         full += chunk;
         setGeneratedText(full);
       }
+
+      // Save generated essay to history
+      const wc = full.split(/\s+/).filter(Boolean).length;
+      const saved = getItem<GeneratedEssay[]>('generated_essays', []);
+      saved.push({
+        id: crypto.randomUUID(),
+        topic,
+        essayType,
+        text: full,
+        wordCount: wc,
+        generatedAt: new Date().toISOString(),
+      });
+      setItem('generated_essays', saved);
+
+      // Track activity for streak
+      setItem('last_active_date', new Date().toISOString().slice(0, 10));
 
       // Auto-scan for AI detection after generation
       scanForAI(full);

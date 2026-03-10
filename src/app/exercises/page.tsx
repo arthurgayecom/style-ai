@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
 import { getItem, setItem } from '@/lib/storage/localStorage';
+import { recordActivity } from '@/lib/streak';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type ExerciseType = 'multiple_choice' | 'fill_blank' | 'rewrite' | 'error_fix';
@@ -230,6 +231,7 @@ export default function ExercisesPage() {
     ls.exercisesDone += 1;
     ls.streak = newStats.streak;
     setItem('learning_stats', ls);
+    recordActivity();
   };
 
   const nextExercise = () => {

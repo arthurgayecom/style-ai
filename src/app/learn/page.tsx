@@ -6,6 +6,7 @@ import { useAIProvider } from '@/hooks/useAIProvider';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
 import { getItem, setItem } from '@/lib/storage/localStorage';
+import { recordActivity } from '@/lib/streak';
 
 interface GradingResult {
   grade: string;
@@ -95,10 +96,11 @@ export default function LearnPage() {
       setResult(parsed);
       setTab('grade');
 
-      // Update learning stats
+      // Update learning stats + activity
       const stats = getItem('learning_stats', { essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 });
       stats.essaysGraded += 1;
       setItem('learning_stats', stats);
+      recordActivity();
 
       toast.success('Essay graded!');
     } catch (err: unknown) {

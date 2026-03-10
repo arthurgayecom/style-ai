@@ -7,6 +7,7 @@ import { useAIProvider } from '@/hooks/useAIProvider';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
 import { getItem, setItem } from '@/lib/storage/localStorage';
+import { recordActivity } from '@/lib/streak';
 
 interface LectureAnalysis {
   title: string;
@@ -204,6 +205,7 @@ export default function RecordPage() {
       const stats = getItem('learning_stats', { essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 });
       stats.lecturesRecorded += 1;
       setItem('learning_stats', stats);
+      recordActivity();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Analysis failed');
     }

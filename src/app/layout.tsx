@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AIProviderProvider } from '@/context/AIProviderContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Navbar } from '@/components/layout/Navbar';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -18,8 +19,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CDL Study Tool',
-  description: 'The ultimate AI-powered study tool — essays, exercises, presentations, lectures, and more',
+  title: {
+    default: 'CDL Study Tool — AI-Powered Essay & Presentation Maker',
+    template: '%s | CDL Study Tool',
+  },
+  description: 'Generate essays that sound like you, create presentations, get AI grading, practice exercises, record lectures, and more. The ultimate AI study tool.',
+  openGraph: {
+    title: 'CDL Study Tool — AI-Powered Essay & Presentation Maker',
+    description: 'Generate essays in your voice, create Gamma-style presentations, get AI grading, and study smarter.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CDL Study Tool',
+    description: 'Generate essays in your voice, create presentations, get AI grading, and study smarter.',
+  },
 };
 
 export default function RootLayout({
@@ -33,10 +47,12 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
           <AIProviderProvider>
+            <ErrorBoundary>
             <Navbar />
             <main className="mx-auto max-w-6xl px-4 py-8">
               {children}
             </main>
+            </ErrorBoundary>
             <Toaster
               position="bottom-right"
               toastOptions={{
