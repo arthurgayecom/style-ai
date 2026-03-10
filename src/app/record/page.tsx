@@ -325,10 +325,30 @@ export default function RecordPage() {
           {/* Action buttons */}
           <div className="flex flex-wrap gap-3 justify-center">
             <button
+              onClick={() => {
+                const combined = transcript.trim() + (uploadedFiles.length > 0 ? '\n\n' + uploadedFiles.map(f => f.text).join('\n\n') : '');
+                setItem('lesson_content', { title: analysis.title, text: combined, keyPoints: analysis.keyPoints, vocabulary: analysis.vocabulary });
+                router.push('/exercises?source=lesson');
+              }}
+              className="rounded-lg bg-success px-6 py-2.5 text-sm font-semibold text-white hover:bg-success/90"
+            >
+              Practice This Lesson
+            </button>
+            <button
               onClick={goToBrainrotVideo}
               className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover"
             >
               Create Brainrot Video
+            </button>
+            <button
+              onClick={() => {
+                const combined = transcript.trim() + (uploadedFiles.length > 0 ? '\n\n' + uploadedFiles.map(f => f.text).join('\n\n') : '');
+                setItem('lesson_content', { title: analysis.title, text: combined, keyPoints: analysis.keyPoints, vocabulary: analysis.vocabulary });
+                router.push('/present');
+              }}
+              className="rounded-lg bg-accent-secondary px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-secondary/90"
+            >
+              Create Presentation
             </button>
             <button
               onClick={() => { navigator.clipboard.writeText(analysis.studyNotes); toast.success('Notes copied!'); }}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAIProvider } from '@/hooks/useAIProvider';
 import { useEssays } from '@/hooks/useEssays';
@@ -9,6 +10,13 @@ import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
 import { getItem, setItem } from '@/lib/storage/localStorage';
 import { recordActivity } from '@/lib/streak';
+
+interface LessonContent {
+  title: string;
+  text: string;
+  keyPoints: string[];
+  vocabulary: string[];
+}
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type ExerciseType = 'multiple_choice' | 'fill_blank' | 'rewrite' | 'error_fix';
@@ -88,8 +96,43 @@ Return ONLY valid JSON (no code blocks):
   ]
 }`;
 
+const LESSON_EXERCISE_PROMPT = `You are an educational exercise generator. The student just studied a lesson. Create 5 exercises that test their understanding of THIS SPECIFIC lesson content.
+
+Questions should:
+- Test knowledge of the key points and concepts from the lesson
+- Include vocabulary and terms FROM the lesson
+- Ask about facts, definitions, and relationships mentioned
+- Mix question types for variety
+- Be engaging and clear
+
+LESSON CONTENT:
+LESSON_TEXT
+
+KEY POINTS:
+KEY_POINTS
+
+KEY TERMS:
+VOCAB_TERMS
+
+Difficulty: DIFFICULTY_LEVEL
+
+Return ONLY valid JSON (no code blocks):
+{
+  "exercises": [
+    {
+      "type": "multiple_choice" | "fill_blank" | "rewrite" | "error_fix",
+      "question": "the question text",
+      "options": ["option1", "option2", "option3", "option4"],
+      "correctAnswer": "the correct answer",
+      "explanation": "why this is correct",
+      "category": "grammar/vocabulary/punctuation/structure/clarity"
+    }
+  ]
+}`;
+
 const SUBJECTS = [
   { value: 'general', label: 'General Writing' },
+  { value: 'lesson', label: 'From Your Lesson' },
   { value: 'grammar', label: 'Grammar' },
   { value: 'vocabulary', label: 'Vocabulary' },
   { value: 'punctuation', label: 'Punctuation' },
@@ -120,7 +163,16 @@ function catColor(cat: string) {
   }
 }
 
-export default function ExercisesPage() {
+export default function ExercisesPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex min-h-[300px] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>}>
+      <ExercisesPage />
+    </Suspense>
+  );
+}
+
+function ExercisesPage() {
+  const searchParams = useSearchParams();
   const { providers, activeProvider } = useAIProvider();
   const { essays } = useEssays();
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
@@ -135,6 +187,7 @@ export default function ExercisesPage() {
   const [loading, setLoading] = useState(false);
   const [sessionDone, setSessionDone] = useState(false);
   const [stats, setStats] = useState<ExerciseStats>(DEFAULT_STATS);
+  const [lessonContent, setLessonContent] = useState<LessonContent | null>(null);
 
   useEffect(() => {
     try {
@@ -145,7 +198,16 @@ export default function ExercisesPage() {
     } catch {
       setStats(DEFAULT_STATS);
     }
-  }, []);
+
+    // Auto-select lesson mode if coming from Record page
+    if (searchParams.get('source') === 'lesson') {
+      const lesson = getItem<LessonContent | null>('lesson_content', null);
+      if (lesson) {
+        setLessonContent(lesson);
+        setSubject('lesson');
+      }
+    }
+  }, [searchParams]);
 
   const toggleEssaySelection = (id: string) => {
     setSelectedEssayIds(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
@@ -167,7 +229,15 @@ export default function ExercisesPage() {
     try {
       let prompt: string;
 
-      if (subject === 'custom') {
+      if (subject === 'lesson') {
+        const lesson = lessonContent || getItem<LessonContent | null>('lesson_content', null);
+        if (!lesson) { toast.error('No lesson content found. Go to Record to analyze a lesson first.'); setLoading(false); return; }
+        prompt = LESSON_EXERCISE_PROMPT
+          .replace('LESSON_TEXT', lesson.text.slice(0, 4000))
+          .replace('KEY_POINTS', lesson.keyPoints.join('\n- '))
+          .replace('VOCAB_TERMS', lesson.vocabulary.join(', '))
+          .replace('DIFFICULTY_LEVEL', difficulty);
+      } else if (subject === 'custom') {
         const selectedEssays = essays.filter(e => selectedEssayIds.includes(e.id));
         const essayContent = selectedEssays.map(e => `### ${e.title}\n${e.text.slice(0, 3000)}`).join('\n\n');
         prompt = CUSTOM_EXERCISE_PROMPT
@@ -288,6 +358,24 @@ export default function ExercisesPage() {
             </select>
           </div>
 
+          {subject === 'lesson' && (
+            <div className="mb-4 rounded-lg border border-border bg-bg-secondary p-3">
+              {lessonContent ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10">
+                    <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-text-primary truncate">{lessonContent.title}</p>
+                    <p className="text-xs text-text-muted">{lessonContent.keyPoints.length} key points, {lessonContent.vocabulary.length} terms</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-text-muted">No lesson loaded. Go to the <span className="text-accent font-medium">Record</span> page, upload or record a lesson, analyze it, then click &quot;Practice This Lesson&quot;.</p>
+              )}
+            </div>
+          )}
+
           {subject === 'custom' && (
             <div className="mb-4">
               <label className="mb-2 block text-sm font-medium text-text-primary">Select Essays</label>
@@ -333,10 +421,10 @@ export default function ExercisesPage() {
 
           <button
             onClick={generateExercises}
-            disabled={subject === 'custom' && selectedEssayIds.length === 0}
+            disabled={(subject === 'custom' && selectedEssayIds.length === 0) || (subject === 'lesson' && !lessonContent)}
             className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40 transition-all"
           >
-            Start Practice
+            {subject === 'lesson' ? 'Practice This Lesson' : 'Start Practice'}
           </button>
         </motion.div>
       ) : loading ? (
