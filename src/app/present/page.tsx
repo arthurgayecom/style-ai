@@ -16,6 +16,7 @@ interface Slide {
   bullets: string[];
   notes: string;
   imageDescription?: string;
+  imageUrl?: string;
   quote?: string;
   quoteAuthor?: string;
   leftColumn?: string[];
@@ -280,6 +281,22 @@ export default function PresentPage() {
       }
 
       parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content' }));
+
+      // Fetch real images for slides with imageDescription
+      if (imageSource === 'descriptions') {
+        const slidesWithImages = parsed.slides.filter(s => s.imageDescription);
+        const imagePromises = slidesWithImages.map(async (s) => {
+          const query = s.imageDescription!.split(' ').slice(0, 4).join(' ');
+          try {
+            const imgUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(query)}&sig=${Date.now() + Math.random()}`;
+            s.imageUrl = imgUrl;
+          } catch {
+            // Leave as description if image fetch fails
+          }
+        });
+        await Promise.all(imagePromises);
+      }
+
       setPresentation(parsed);
       setCurrentSlide(0);
       setViewMode('slide');
@@ -363,7 +380,16 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
           <div className="flex h-full flex-col items-center justify-center text-center">
             <h3 className="mb-4 text-3xl font-bold text-text-primary sm:text-4xl">{s.title}</h3>
             {s.bullets[0] && <p className="text-lg text-text-secondary">{s.bullets[0]}</p>}
-            {s.imageDescription && <p className="mt-6 text-sm italic text-text-muted">[{s.imageDescription}]</p>}
+            {s.imageDescription && (
+              s.imageUrl ? (
+                <div className="mt-6 overflow-hidden rounded-lg max-w-sm mx-auto">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.imageUrl} alt={s.imageDescription} className="w-full object-cover rounded-lg" />
+                </div>
+              ) : (
+                <p className="mt-6 text-sm italic text-text-muted">[{s.imageDescription}]</p>
+              )
+            )}
           </div>
         );
       case 'quote':
@@ -399,9 +425,16 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
           <div className="flex h-full flex-col justify-center">
             <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
             <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-6">
-                <p className="text-sm italic text-text-muted text-center">{s.imageDescription || 'Image'}</p>
-              </div>
+              {s.imageUrl ? (
+                <div className="overflow-hidden rounded-lg">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover rounded-lg" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-6">
+                  <p className="text-sm italic text-text-muted text-center">{s.imageDescription || 'Image'}</p>
+                </div>
+              )}
               <ul className="space-y-3">{s.bullets.map((b, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</li>
               ))}</ul>
@@ -473,9 +506,16 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                 ))}
               </ul>
               {s.imageDescription && (
-                <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-4">
-                  <p className="text-xs italic text-text-muted text-center">{s.imageDescription}</p>
-                </div>
+                s.imageUrl ? (
+                  <div className="overflow-hidden rounded-lg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.imageUrl} alt={s.imageDescription} className="h-full w-full object-cover rounded-lg" />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-4">
+                    <p className="text-xs italic text-text-muted text-center">{s.imageDescription}</p>
+                  </div>
+                )
               )}
             </div>
           </div>

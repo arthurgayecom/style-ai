@@ -29,10 +29,23 @@ export async function POST(req: NextRequest) {
       }
 
       case 'gemini': {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        await model.generateContent('Hi');
+        // Use REST API directly — more reliable than SDK across environments
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'Hi' }] }],
+              generationConfig: { maxOutputTokens: 10 },
+            }),
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = err?.error?.message || `Gemini API error (${res.status})`;
+          return NextResponse.json({ connected: false, error: msg });
+        }
         return NextResponse.json({ connected: true, model: 'gemini-2.0-flash' });
       }
 
@@ -43,6 +56,7 @@ export async function POST(req: NextRequest) {
             const child = spawn('claude', ['--version'], { stdio: ['pipe', 'pipe', 'pipe'] });
             child.on('close', (code) => resolve(code === 0));
             child.on('error', () => resolve(false));
+            setTimeout(() => { try { child.kill(); } catch {} resolve(false); }, 5000);
           } catch {
             resolve(false);
           }
@@ -54,6 +68,13 @@ export async function POST(req: NextRequest) {
       }
 
       case 'kimi': {
+        // Check key format first
+        if (apiKey && !apiKey.startsWith('sk-')) {
+          return NextResponse.json({
+            connected: false,
+            error: `Invalid key format. Kimi (Moonshot) keys start with "sk-". Your key starts with "${apiKey.slice(0, 6)}..." which looks like a different provider's key.`,
+          });
+        }
         const OpenAI = (await import('openai')).default;
         const client = new OpenAI({ apiKey, baseURL: 'https://api.moonshot.cn/v1' });
         await client.chat.completions.create({

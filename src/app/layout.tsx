@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AIProviderProvider } from '@/context/AIProviderContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
+          <AuthProvider>
           <AIProviderProvider>
             <Navbar />
             <main className="mx-auto max-w-6xl px-4 py-8">
@@ -46,6 +48,7 @@ export default function RootLayout({
               }}
             />
           </AIProviderProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

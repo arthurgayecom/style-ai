@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from './ThemeToggle';
+import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 
 const NAV_LINKS = [
@@ -19,6 +20,7 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const { user, signOut, configured } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -57,6 +59,21 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {/* Auth button */}
+          {configured && (
+            user ? (
+              <div className="hidden items-center gap-2 md:flex">
+                <span className="text-xs text-text-muted truncate max-w-[120px]">{user.email}</span>
+                <button onClick={() => signOut()} className="rounded-lg border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-bg-hover">
+                  Log out
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="hidden rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover md:block">
+                Log in
+              </Link>
+            )
+          )}
           <ThemeToggle />
           {/* Mobile hamburger */}
           <button
@@ -110,6 +127,24 @@ export function Navbar() {
                 </motion.div>
               );
             })}
+            {/* Mobile auth */}
+            {configured && (
+              <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: NAV_LINKS.length * 0.03 }}>
+                <div className="mt-2 border-t border-border pt-2">
+                  {user ? (
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-xs text-text-muted truncate">{user.email}</span>
+                      <button onClick={() => { signOut(); setMobileOpen(false); }} className="text-xs text-error hover:underline">Log out</button>
+                    </div>
+                  ) : (
+                    <Link href="/login" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-accent hover:bg-bg-hover">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
+                      Log in / Register
+                    </Link>
+                  )}
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
