@@ -1,4 +1,4 @@
-export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'claude-cli' | 'kimi' | 'ollama';
+export type ProviderType = 'free' | 'anthropic' | 'openai' | 'gemini' | 'claude-cli' | 'kimi' | 'ollama';
 
 export interface ProviderConfig {
   type: ProviderType;
@@ -19,6 +19,15 @@ export interface ProviderInfo {
 }
 
 export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
+  free: {
+    type: 'free',
+    name: 'Free (Built-in)',
+    description: 'Powered by Gemini Flash — no setup needed, 25 requests/day',
+    models: ['gemini-2.0-flash'],
+    defaultModel: 'gemini-2.0-flash',
+    supportsVision: true,
+    requiresApiKey: false,
+  },
   anthropic: {
     type: 'anthropic',
     name: 'Anthropic Claude',

@@ -6,6 +6,25 @@ export async function POST(req: NextRequest) {
     const { type, apiKey } = (await req.json()) as { type: ProviderType; apiKey?: string };
 
     switch (type) {
+      case 'free': {
+        const freeKey = process.env.FREE_GEMINI_API_KEY;
+        if (!freeKey) {
+          return NextResponse.json({ connected: false, error: 'Free AI not configured on this server. The site owner needs to add FREE_GEMINI_API_KEY.' });
+        }
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${freeKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }], generationConfig: { maxOutputTokens: 10 } }),
+          }
+        );
+        if (!res.ok) {
+          return NextResponse.json({ connected: false, error: 'Free AI key is invalid or expired' });
+        }
+        return NextResponse.json({ connected: true, model: 'gemini-2.0-flash' });
+      }
+
       case 'anthropic': {
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const client = new Anthropic({ apiKey });

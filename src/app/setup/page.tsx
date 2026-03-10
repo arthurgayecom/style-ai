@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 const API_PROVIDERS: ProviderType[] = ['anthropic', 'openai', 'gemini', 'kimi'];
 
 const PROVIDER_COLORS: Record<ProviderType, string> = {
+  free: 'text-success',
   'claude-cli': 'text-accent',
   anthropic: 'text-[#d4a27f]',
   openai: 'text-[#10a37f]',
@@ -31,6 +32,7 @@ export default function SetupPage() {
   useEffect(() => {
     if (!autoChecked.current) {
       autoChecked.current = true;
+      handleTest('free', true);
       handleTest('claude-cli', true);
       handleTest('ollama', true);
     }
@@ -73,6 +75,12 @@ export default function SetupPage() {
   };
 
   const canContinue = activeProvider && providers[activeProvider]?.enabled;
+
+  const freeResult = testResults['free'];
+  const freeTesting = testing === 'free';
+  const freeActive = activeProvider === 'free';
+  const freeEnabled = providers['free']?.enabled;
+
   const cliResult = testResults['claude-cli'];
   const cliTesting = testing === 'claude-cli';
   const cliActive = activeProvider === 'claude-cli';
@@ -90,14 +98,67 @@ export default function SetupPage() {
         <p className="text-text-secondary">Connect Claude Code, an API key, or a local model.</p>
       </div>
 
-      {/* Claude MAX — featured card */}
+      {/* FREE — top featured card */}
+      <div
+        className={`mb-6 rounded-xl border-2 p-6 transition-all ${
+          freeActive ? 'border-success bg-success/5' : freeResult === 'success' ? 'border-success/50 bg-success/5' : 'border-border bg-bg-card'
+        }`}
+        style={{ boxShadow: 'var(--card-shadow)' }}
+      >
+        <span className="rounded bg-success/20 px-2 py-0.5 text-xs font-bold text-success uppercase tracking-wide">Easiest — No Setup</span>
+        <div className="flex items-start justify-between gap-4 mt-3">
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-success mb-1">Free Built-in AI</h3>
+            <p className="text-sm text-text-secondary mb-1">Powered by Google Gemini Flash. No API key needed — just works.</p>
+            <p className="text-xs text-text-muted mb-4">25 requests per day per person. Need more? Connect your own key below.</p>
+            <div className="flex items-center gap-3">
+              {freeResult === 'success' ? (
+                <span className="flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-sm font-medium text-success">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  Ready to use
+                </span>
+              ) : freeResult === 'error' ? (
+                <div>
+                  <span className="flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-sm text-warning mb-2">Free AI not available — use an API key below</span>
+                  <button onClick={() => handleTest('free')} className="text-xs text-text-muted hover:text-text-primary">Retry</button>
+                </div>
+              ) : freeTesting ? (
+                <span className="flex items-center gap-1.5 text-sm text-text-muted">
+                  <LoadingSpinner />
+                  Checking...
+                </span>
+              ) : (
+                <button onClick={() => handleTest('free')} className="rounded-lg bg-bg-hover px-4 py-2 text-sm font-medium text-text-primary hover:bg-border">Check</button>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => handleSelect('free')}
+            disabled={!freeEnabled}
+            className={`shrink-0 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all ${
+              freeActive ? 'bg-success text-white' : 'border border-border text-text-secondary hover:border-success hover:text-success disabled:opacity-40 disabled:cursor-not-allowed'
+            }`}
+          >
+            {freeActive ? 'Active' : 'Use Free'}
+          </button>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Or bring your own AI</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {/* Claude CLI card */}
       <div
         className={`mb-6 rounded-xl border-2 p-6 transition-all ${
           cliActive ? 'border-accent bg-accent/5' : cliResult === 'success' ? 'border-success/50 bg-success/5' : 'border-border bg-bg-card'
         }`}
         style={{ boxShadow: 'var(--card-shadow)' }}
       >
-        <span className="rounded bg-accent/20 px-2 py-0.5 text-xs font-bold text-accent uppercase tracking-wide">Recommended</span>
+        <span className="rounded bg-accent/20 px-2 py-0.5 text-xs font-bold text-accent uppercase tracking-wide">Best Quality</span>
         <div className="flex items-start justify-between gap-4 mt-3">
           <div className="flex-1">
             <h3 className="text-xl font-bold text-accent mb-1">Claude Code (CLI)</h3>

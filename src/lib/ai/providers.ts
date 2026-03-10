@@ -6,6 +6,13 @@ export function createProvider(config: ProviderConfig): AIProvider {
   const model = config.model || PROVIDERS[config.type].defaultModel;
 
   switch (config.type) {
+    case 'free': {
+      // Free provider uses server-side Gemini key from env
+      const { createGeminiProvider } = require('./gemini');
+      const freeKey = process.env.FREE_GEMINI_API_KEY;
+      if (!freeKey) throw new Error('Free AI not configured. Ask the site owner to add FREE_GEMINI_API_KEY.');
+      return createGeminiProvider(freeKey, 'gemini-2.0-flash');
+    }
     case 'anthropic': {
       const { createAnthropicProvider } = require('./anthropic');
       return createAnthropicProvider(config.apiKey!, model);

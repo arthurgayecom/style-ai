@@ -16,6 +16,7 @@ interface AIProviderContextValue {
 }
 
 const DEFAULT_PROVIDERS: Record<ProviderType, ProviderConfig> = {
+  free: { type: 'free', enabled: false },
   anthropic: { type: 'anthropic', apiKey: '', enabled: false },
   openai: { type: 'openai', apiKey: '', enabled: false },
   gemini: { type: 'gemini', apiKey: '', enabled: false },
@@ -39,13 +40,29 @@ export function AIProviderProvider({ children }: { children: React.ReactNode }) 
   const [activeProvider, setActiveProviderState] = useState<ProviderType | null>(null);
   const cloudSyncRef = useRef(false);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount, auto-detect free provider
   useEffect(() => {
     const saved = getItem<Record<string, ProviderConfig>>('providers', {});
     const merged = { ...DEFAULT_PROVIDERS, ...saved };
     const active = getItem<ProviderType | null>('active_provider', null);
     setProviders(merged as Record<ProviderType, ProviderConfig>);
     setActiveProviderState(active);
+
+    // Auto-detect free provider if nothing is configured
+    if (!active) {
+      fetch('/api/ai/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'free' }),
+      }).then(r => r.json()).then(data => {
+        if (data.connected) {
+          setProviders(prev => ({ ...prev, free: { type: 'free', enabled: true, model: 'gemini-2.0-flash' } }));
+          setActiveProviderState('free');
+          setItem('providers', { ...merged, free: { type: 'free', enabled: true, model: 'gemini-2.0-flash' } });
+          setItem('active_provider', 'free');
+        }
+      }).catch(() => { /* silent */ });
+    }
   }, []);
 
   // Auto-sync from cloud on login
