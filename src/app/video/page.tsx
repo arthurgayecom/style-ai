@@ -1,0 +1,363 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { useAIProvider } from '@/hooks/useAIProvider';
+import { getItem } from '@/lib/storage/localStorage';
+import { BACKGROUNDS, type Background } from '@/lib/video/backgrounds';
+import { PODCAST_PROMPT } from '@/lib/video/prompts';
+import { fadeInUp } from '@/lib/animations';
+import { toast } from 'sonner';
+
+interface Segment {
+  speaker: 'A' | 'B';
+  text: string;
+  emotion: string;
+}
+
+interface PodcastScript {
+  title: string;
+  segments: Segment[];
+}
+
+export default function VideoPage() {
+  const { providers, activeProvider } = useAIProvider();
+  const [transcript, setTranscript] = useState('');
+  const [script, setScript] = useState<PodcastScript | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  // Player state
+  const [playing, setPlaying] = useState(false);
+  const [currentSegment, setCurrentSegment] = useState(0);
+  const [currentWord, setCurrentWord] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [brainrot, setBrainrot] = useState(false);
+  const [selectedBg, setSelectedBg] = useState<Background>(BACKGROUNDS[0]);
+  const [customUrl, setCustomUrl] = useState('');
+
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Load transcript from localStorage
+  useEffect(() => {
+    const saved = getItem<string>('current_transcript', '');
+    if (saved) setTranscript(saved);
+  }, []);
+
+  // Load voices (needed after first interaction)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
+
+  const getVoiceForSpeaker = useCallback((speaker: 'A' | 'B'): SpeechSynthesisVoice | undefined => {
+    const english = voices.filter(v => v.lang.startsWith('en'));
+    const pool = english.length >= 2 ? english : voices;
+    if (speaker === 'A') return pool[0];
+    return pool[1] || pool[0];
+  }, [voices]);
+
+  const generateScript = async () => {
+    if (!transcript.trim()) { toast.error('No transcript loaded. Go to Record page first.'); return; }
+    const config = activeProvider ? providers[activeProvider] : null;
+    if (!config) { toast.error('No AI provider configured'); return; }
+
+    setGenerating(true);
+    setScript(null);
+    try {
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'custom',
+          essayText: `LESSON TRANSCRIPT:\n${transcript}`,
+          systemPrompt: PODCAST_PROMPT,
+          providerConfig: config,
+        }),
+      });
+      const data = await res.json();
+
+      let parsed: PodcastScript;
+      if (data.analysis?.segments) {
+        parsed = data.analysis;
+      } else if (data.raw) {
+        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+        parsed = JSON.parse(cleaned);
+      } else {
+        throw new Error('Could not parse podcast script');
+      }
+
+      setScript(parsed);
+      setCurrentSegment(0);
+      setCurrentWord(0);
+      toast.success(`Podcast ready — ${parsed.segments.length} segments!`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Generation failed');
+    }
+    setGenerating(false);
+  };
+
+  const playSegment = useCallback((segIdx: number) => {
+    if (!script || segIdx >= script.segments.length) {
+      setPlaying(false);
+      return;
+    }
+
+    const seg = script.segments[segIdx];
+    setCurrentSegment(segIdx);
+    setCurrentWord(0);
+
+    const utterance = new SpeechSynthesisUtterance(seg.text);
+    const voice = getVoiceForSpeaker(seg.speaker);
+    if (voice) utterance.voice = voice;
+    utterance.rate = speed;
+
+    const words = seg.text.split(/\s+/);
+    utterance.onboundary = (e) => {
+      if (e.name === 'word') {
+        let accum = 0;
+        for (let i = 0; i < words.length; i++) {
+          if (accum >= e.charIndex) { setCurrentWord(i); break; }
+          accum += words[i].length + 1;
+        }
+      }
+    };
+
+    utterance.onend = () => {
+      playSegment(segIdx + 1);
+    };
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [script, speed, getVoiceForSpeaker]);
+
+  const handlePlay = () => {
+    if (playing) {
+      window.speechSynthesis.cancel();
+      setPlaying(false);
+    } else {
+      setPlaying(true);
+      playSegment(currentSegment);
+    }
+  };
+
+  const handleSkip = (dir: number) => {
+    window.speechSynthesis.cancel();
+    const next = Math.max(0, Math.min((script?.segments.length || 1) - 1, currentSegment + dir));
+    setCurrentSegment(next);
+    setCurrentWord(0);
+    if (playing) playSegment(next);
+  };
+
+  useEffect(() => {
+    return () => { window.speechSynthesis.cancel(); };
+  }, []);
+
+  const currentSeg = script?.segments[currentSegment];
+  const words = currentSeg?.text.split(/\s+/) || [];
+  const bgUrl = brainrot
+    ? (selectedBg.category === 'custom' ? customUrl : selectedBg.url)
+    : null;
+
+  const speakerColor = (s: string) => s === 'A' ? 'text-accent' : 'text-accent-secondary';
+  const speakerName = (s: string) => s === 'A' ? 'Alex' : 'Sam';
+
+  return (
+    <motion.div className="mx-auto max-w-4xl" {...fadeInUp}>
+      <div className="mb-8 text-center">
+        <h1 className="mb-2 text-3xl font-bold gradient-text inline-block">AI Brainrot Video</h1>
+        <p className="text-text-secondary">TikTok-style podcast from your lesson — with optional gameplay backgrounds</p>
+      </div>
+
+      {!script ? (
+        <div className="mx-auto max-w-lg space-y-4">
+          <div className="rounded-xl border border-border bg-bg-card p-5" style={{ boxShadow: 'var(--card-shadow)' }}>
+            <h2 className="mb-2 text-sm font-semibold text-text-primary">Lesson Content</h2>
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Paste your lesson transcript or go to Record page to capture one..."
+              rows={8}
+              className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring resize-none"
+            />
+            {transcript && <p className="mt-1 text-xs text-text-muted">{transcript.split(/\s+/).filter(Boolean).length} words</p>}
+          </div>
+
+          <button
+            onClick={generateScript}
+            disabled={generating || !transcript.trim()}
+            className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
+          >
+            {generating ? 'Generating Podcast Script...' : 'Generate Podcast'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Video player container */}
+          <div className="relative mx-auto overflow-hidden rounded-2xl border border-border bg-black" style={{ maxWidth: 400, aspectRatio: '9/16' }}>
+            {/* Background video */}
+            {bgUrl && (
+              <video
+                ref={videoRef}
+                src={bgUrl}
+                className="absolute inset-0 h-full w-full object-cover opacity-40"
+                muted autoPlay loop playsInline
+              />
+            )}
+
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/60" />
+
+            {/* Content overlay */}
+            <div className="relative flex h-full flex-col justify-between p-6">
+              {/* Title */}
+              <div>
+                <p className="text-xs font-medium text-white/60 uppercase tracking-wider mb-1">{script.title}</p>
+                <p className="text-xs text-white/40">Segment {currentSegment + 1}/{script.segments.length}</p>
+              </div>
+
+              {/* Speaker + Subtitles */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                {currentSeg && (
+                  <>
+                    <div className={`mb-4 rounded-full bg-black/50 px-4 py-1 text-sm font-bold ${speakerColor(currentSeg.speaker)}`}>
+                      {speakerName(currentSeg.speaker)}
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-lg font-bold leading-relaxed">
+                        {words.map((word, i) => (
+                          <span
+                            key={i}
+                            className={`inline-block mx-0.5 transition-all duration-150 ${
+                              i === currentWord
+                                ? 'text-white scale-110'
+                                : i < currentWord
+                                  ? 'text-white/70'
+                                  : 'text-white/30'
+                            }`}
+                          >
+                            {word}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-4">
+                <button onClick={() => handleSkip(-1)} className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button onClick={handlePlay} className="rounded-full bg-white/20 p-4 text-white hover:bg-white/30">
+                  {playing ? (
+                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" /></svg>
+                  ) : (
+                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  )}
+                </button>
+                <button onClick={() => handleSkip(1)} className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+              <div className="h-full bg-accent transition-all" style={{ width: `${((currentSegment + 1) / script.segments.length) * 100}%` }} />
+            </div>
+          </div>
+
+          {/* Controls panel */}
+          <div className="rounded-xl border border-border bg-bg-card p-5" style={{ boxShadow: 'var(--card-shadow)' }}>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Speed */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Speed</label>
+                <div className="flex gap-1">
+                  {[0.75, 1, 1.25, 1.5].map(s => (
+                    <button key={s} onClick={() => setSpeed(s)}
+                      className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all ${speed === s ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Brainrot toggle */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Brainrot Mode</label>
+                <button
+                  onClick={() => setBrainrot(!brainrot)}
+                  className={`w-full rounded-lg py-1.5 text-sm font-medium transition-all ${brainrot ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}
+                >
+                  {brainrot ? 'ON — Gameplay Background' : 'OFF — Clean View'}
+                </button>
+              </div>
+            </div>
+
+            {/* Background selector */}
+            {brainrot && (
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-medium text-text-primary">Background</label>
+                <div className="flex flex-wrap gap-2">
+                  {BACKGROUNDS.filter(b => b.category !== 'none').map(bg => (
+                    <button
+                      key={bg.id}
+                      onClick={() => setSelectedBg(bg)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                        selectedBg.id === bg.id ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'
+                      }`}
+                    >
+                      {bg.label}
+                    </button>
+                  ))}
+                </div>
+                {selectedBg.category === 'custom' && (
+                  <input
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="Paste a direct video URL (MP4)..."
+                    className="mt-2 w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring"
+                  />
+                )}
+                <p className="mt-2 text-xs text-text-muted">
+                  Place MP4 files in the public/videos/ folder (subway.mp4, minecraft.mp4, satisfying.mp4)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Script segments */}
+          <div className="rounded-xl border border-border bg-bg-card p-5" style={{ boxShadow: 'var(--card-shadow)' }}>
+            <h3 className="mb-3 text-sm font-semibold text-text-primary">Script ({script.segments.length} segments)</h3>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {script.segments.map((seg, i) => (
+                <button
+                  key={i}
+                  onClick={() => { window.speechSynthesis.cancel(); setCurrentSegment(i); setCurrentWord(0); if (playing) playSegment(i); }}
+                  className={`w-full rounded-lg p-3 text-left text-sm transition-all ${
+                    i === currentSegment ? 'border border-accent bg-accent/5' : 'border border-transparent hover:bg-bg-hover'
+                  }`}
+                >
+                  <span className={`mr-2 font-bold ${speakerColor(seg.speaker)}`}>{speakerName(seg.speaker)}:</span>
+                  <span className="text-text-secondary">{seg.text}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-center">
+            <button onClick={() => setScript(null)} className="rounded-lg border border-border px-6 py-2.5 text-sm text-text-secondary hover:bg-bg-hover">
+              Generate New Script
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}

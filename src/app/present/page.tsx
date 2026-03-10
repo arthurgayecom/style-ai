@@ -1,0 +1,837 @@
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAIProvider } from '@/hooks/useAIProvider';
+import { useStyleProfile } from '@/hooks/useStyleProfile';
+import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { toast } from 'sonner';
+
+type SlideLayout = 'title' | 'content' | 'image_text' | 'comparison' | 'quote' | 'section' | 'timeline' | 'stats' | 'steps';
+
+interface Slide {
+  layout: SlideLayout;
+  title: string;
+  bullets: string[];
+  notes: string;
+  imageDescription?: string;
+  quote?: string;
+  quoteAuthor?: string;
+  leftColumn?: string[];
+  rightColumn?: string[];
+  leftLabel?: string;
+  rightLabel?: string;
+  steps?: { label: string; description: string }[];
+  stats?: { value: string; label: string }[];
+  timelineItems?: { date: string; event: string }[];
+}
+
+interface Presentation {
+  title: string;
+  slides: Slide[];
+}
+
+/* ── Option Arrays ── */
+
+const LANGUAGES = [
+  { value: 'english', label: 'English' }, { value: 'french', label: 'French' },
+  { value: 'spanish', label: 'Spanish' }, { value: 'german', label: 'German' },
+  { value: 'arabic', label: 'Arabic' }, { value: 'chinese', label: 'Chinese' },
+  { value: 'portuguese', label: 'Portuguese' }, { value: 'italian', label: 'Italian' },
+  { value: 'japanese', label: 'Japanese' }, { value: 'korean', label: 'Korean' },
+  { value: 'russian', label: 'Russian' }, { value: 'hindi', label: 'Hindi' },
+];
+
+const STYLES = [
+  { value: 'Professional', desc: 'Clean corporate look' },
+  { value: 'Creative', desc: 'Colorful and expressive' },
+  { value: 'Minimal', desc: 'Less is more' },
+  { value: 'Academic', desc: 'Scholarly and formal' },
+  { value: 'Playful', desc: 'Fun and engaging' },
+  { value: 'Bold', desc: 'High impact statements' },
+  { value: 'Elegant', desc: 'Refined and sophisticated' },
+  { value: 'Tech', desc: 'Modern tech aesthetic' },
+  { value: 'Startup', desc: 'Pitch-ready energy' },
+  { value: 'Retro', desc: 'Vintage vibes' },
+  { value: 'Corporate', desc: 'Board-room ready' },
+  { value: 'Artistic', desc: 'Visual storytelling' },
+];
+
+const FORMATS = [
+  { value: 'standard', label: 'Standard Slides', desc: 'General purpose' },
+  { value: 'pitch', label: 'Pitch Deck', desc: 'Investor-ready' },
+  { value: 'report', label: 'Report', desc: 'Data-driven' },
+  { value: 'lesson', label: 'Lesson Plan', desc: 'Educational' },
+  { value: 'workshop', label: 'Workshop', desc: 'Interactive session' },
+  { value: 'keynote', label: 'Keynote', desc: 'Conference talk' },
+  { value: 'ted_talk', label: 'TED-style Talk', desc: 'Story-driven' },
+  { value: 'case_study', label: 'Case Study', desc: 'Problem → Solution' },
+  { value: 'tutorial', label: 'Tutorial', desc: 'Step-by-step guide' },
+  { value: 'team_meeting', label: 'Team Meeting', desc: 'Status updates' },
+  { value: 'research', label: 'Research Defense', desc: 'Academic defense' },
+  { value: 'product_demo', label: 'Product Demo', desc: 'Feature showcase' },
+];
+
+const LEVELS = ['Elementary', 'High School', 'University', 'Professional', 'Expert'];
+
+const TONES = [
+  'Formal', 'Conversational', 'Humorous', 'Inspirational',
+  'Persuasive', 'Analytical', 'Storytelling', 'Motivational',
+];
+
+const AUDIENCES = [
+  { value: 'general', label: 'General Public' },
+  { value: 'academic', label: 'Academic / Researchers' },
+  { value: 'professional', label: 'Business / Professional' },
+  { value: 'casual', label: 'Casual / School' },
+  { value: 'investors', label: 'Investors / Stakeholders' },
+  { value: 'technical', label: 'Technical / Developers' },
+  { value: 'executives', label: 'C-Suite / Executives' },
+  { value: 'students', label: 'Students / Learners' },
+];
+
+const COLOR_SCHEMES = [
+  { value: 'auto', label: 'Auto', colors: ['#6366f1', '#8b5cf6', '#a78bfa'] },
+  { value: 'blue', label: 'Ocean', colors: ['#3b82f6', '#2563eb', '#60a5fa'] },
+  { value: 'purple', label: 'Amethyst', colors: ['#8b5cf6', '#7c3aed', '#a78bfa'] },
+  { value: 'green', label: 'Forest', colors: ['#22c55e', '#16a34a', '#4ade80'] },
+  { value: 'red', label: 'Crimson', colors: ['#ef4444', '#dc2626', '#f87171'] },
+  { value: 'orange', label: 'Sunset', colors: ['#f97316', '#ea580c', '#fb923c'] },
+  { value: 'teal', label: 'Aqua', colors: ['#14b8a6', '#0d9488', '#2dd4bf'] },
+  { value: 'rose', label: 'Rose', colors: ['#f43f5e', '#e11d48', '#fb7185'] },
+  { value: 'mono', label: 'Mono', colors: ['#6b7280', '#4b5563', '#9ca3af'] },
+  { value: 'dark', label: 'Dark', colors: ['#1e293b', '#334155', '#475569'] },
+];
+
+const CONTENT_DENSITY = [
+  { value: 'brief', label: 'Brief', desc: '2-3 bullets per slide' },
+  { value: 'standard', label: 'Standard', desc: '4-5 bullets per slide' },
+  { value: 'detailed', label: 'Detailed', desc: '6+ bullets, more depth' },
+];
+
+const TRANSITIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide', label: 'Slide' },
+  { value: 'zoom', label: 'Zoom' },
+];
+
+/* ── Prompt Builder ── */
+
+function buildPrompt(opts: {
+  language: string; style: string; format: string; level: string;
+  tone: string; imageSource: string; slideCount: number; audience: string;
+  colorScheme: string; contentDensity: string; transition: string;
+  includeTOC: boolean; includeSummary: boolean; includeTakeaways: boolean;
+  includeReferences: boolean; customInstructions: string;
+  styleSection: string;
+}) {
+  const densityMap: Record<string, string> = {
+    brief: 'Keep slides concise with only 2-3 key bullet points each. Less text, more impact.',
+    standard: 'Use 4-5 bullet points per content slide. Balance detail with readability.',
+    detailed: 'Use 6+ bullet points where appropriate. Provide thorough coverage of each topic.',
+  };
+
+  let specialSlides = '';
+  if (opts.includeTOC) specialSlides += '\n- Include a Table of Contents / Agenda slide after the title';
+  if (opts.includeSummary) specialSlides += '\n- Include a Summary / Conclusion slide at the end';
+  if (opts.includeTakeaways) specialSlides += '\n- Include a Key Takeaways slide near the end';
+  if (opts.includeReferences) specialSlides += '\n- Include a Sources / References slide at the very end';
+
+  return `You are an expert presentation designer like Gamma AI. Create a ${opts.format} presentation.
+
+LANGUAGE: ${opts.language}
+VISUAL STYLE: ${opts.style}
+COLOR SCHEME: ${opts.colorScheme} (hint the color theme in content tone)
+TONE: ${opts.tone}
+AUDIENCE LEVEL: ${opts.level}
+AUDIENCE: ${opts.audience}
+TARGET SLIDES: ${opts.slideCount}
+CONTENT DENSITY: ${densityMap[opts.contentDensity] || densityMap.standard}
+TRANSITION STYLE: ${opts.transition} (suggest pacing accordingly)
+${opts.imageSource === 'descriptions' ? 'Include "imageDescription" for relevant slides (describe what image should appear).' : 'Do not include images.'}
+${specialSlides ? `\nSPECIAL SLIDES:${specialSlides}` : ''}
+${opts.customInstructions ? `\nCUSTOM INSTRUCTIONS:\n${opts.customInstructions}` : ''}
+
+WRITING STYLE:
+${opts.styleSection}
+
+Use VARIED slide layouts for visual interest. Available layouts:
+- title: Large title + optional subtitle in bullets[0]
+- content: Title + bullet points + optional imageDescription
+- image_text: Split layout — imageDescription on one side, bullets on other
+- comparison: Two columns with leftLabel, leftColumn, rightLabel, rightColumn
+- quote: A notable quote with quoteAuthor
+- section: Section break with just a title
+- timeline: Chronological events with timelineItems: [{date, event}]
+- stats: Key statistics with stats: [{value, label}] (3-4 items)
+- steps: Process/steps with steps: [{label, description}]
+
+Return ONLY valid JSON (no code blocks):
+{
+  "title": "presentation title",
+  "slides": [
+    {"layout": "title", "title": "...", "bullets": ["subtitle"], "notes": "..."},
+    {"layout": "content", "title": "...", "bullets": ["..."], "notes": "...", "imageDescription": "..."},
+    {"layout": "comparison", "title": "...", "bullets": [], "notes": "...", "leftLabel": "...", "leftColumn": ["..."], "rightLabel": "...", "rightColumn": ["..."]},
+    {"layout": "quote", "title": "...", "bullets": [], "notes": "...", "quote": "...", "quoteAuthor": "..."},
+    {"layout": "timeline", "title": "...", "bullets": [], "notes": "...", "timelineItems": [{"date": "...", "event": "..."}]},
+    {"layout": "stats", "title": "...", "bullets": [], "notes": "...", "stats": [{"value": "85%", "label": "..."}]},
+    {"layout": "steps", "title": "...", "bullets": [], "notes": "...", "steps": [{"label": "Step 1", "description": "..."}]}
+  ]
+}
+
+Make it engaging, NOT generic AI text. Every slide should have speaker notes. Vary layouts — do NOT repeat the same layout more than twice in a row.`;
+}
+
+/* ── Component ── */
+
+export default function PresentPage() {
+  const { providers, activeProvider } = useAIProvider();
+  const { profile, hasProfile } = useStyleProfile();
+
+  // Core
+  const [topic, setTopic] = useState('');
+  const [slideCount, setSlideCount] = useState(10);
+  const [audience, setAudience] = useState('general');
+  const [language, setLanguage] = useState('english');
+  const [imageSource, setImageSource] = useState('descriptions');
+  const [style, setStyle] = useState('Professional');
+  const [format, setFormat] = useState('standard');
+  const [level, setLevel] = useState('University');
+  const [tone, setTone] = useState('Formal');
+
+  // Advanced
+  const [colorScheme, setColorScheme] = useState('auto');
+  const [contentDensity, setContentDensity] = useState('standard');
+  const [transition, setTransition] = useState('fade');
+  const [includeTOC, setIncludeTOC] = useState(false);
+  const [includeSummary, setIncludeSummary] = useState(true);
+  const [includeTakeaways, setIncludeTakeaways] = useState(false);
+  const [includeReferences, setIncludeReferences] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Viewer
+  const [presentation, setPresentation] = useState<Presentation | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<'slide' | 'grid' | 'outline'>('slide');
+  const presentRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (!presentation) return;
+    if (e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      setCurrentSlide(c => Math.min(c + 1, presentation.slides.length - 1));
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setCurrentSlide(c => Math.max(c - 1, 0));
+    } else if (e.key === 'Escape' && fullscreen) {
+      document.exitFullscreen?.();
+      setFullscreen(false);
+    }
+  }, [presentation, fullscreen]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [handleKey]);
+
+  const generatePresentation = async () => {
+    if (!topic.trim()) { toast.error('Enter a topic'); return; }
+    const config = activeProvider ? providers[activeProvider] : null;
+    if (!config) { toast.error('No AI provider configured — go to Setup'); return; }
+
+    setLoading(true);
+    setPresentation(null);
+    try {
+      const styleSection = hasProfile
+        ? `Match the writer's style:\n${profile.fingerprint || 'Natural, non-AI tone.'}\nFormality: ${profile.dimensions?.tone?.formality || 50}/100`
+        : 'Write naturally. Avoid generic AI language.';
+
+      const prompt = buildPrompt({
+        language, style, format, level, tone, imageSource, slideCount, audience,
+        colorScheme, contentDensity, transition,
+        includeTOC, includeSummary, includeTakeaways, includeReferences,
+        customInstructions, styleSection,
+      });
+      const userMsg = `Topic: ${topic}\n\nCreate the presentation.`;
+
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'custom', essayText: userMsg, systemPrompt: prompt, providerConfig: config }),
+      });
+      const data = await res.json();
+
+      let parsed: Presentation;
+      if (data.analysis?.slides) {
+        parsed = data.analysis;
+      } else if (data.raw) {
+        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+        parsed = JSON.parse(cleaned);
+      } else {
+        throw new Error('Could not parse presentation');
+      }
+
+      parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content' }));
+      setPresentation(parsed);
+      setCurrentSlide(0);
+      setViewMode('slide');
+      toast.success(`Created ${parsed.slides.length} slides!`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Generation failed');
+    }
+    setLoading(false);
+  };
+
+  const goToSlide = (idx: number) => {
+    if (presentation && idx >= 0 && idx < presentation.slides.length) {
+      setCurrentSlide(idx);
+      setViewMode('slide');
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!fullscreen && presentRef.current) { presentRef.current.requestFullscreen?.(); setFullscreen(true); }
+    else if (document.fullscreenElement) { document.exitFullscreen?.(); setFullscreen(false); }
+  };
+
+  const exportAsText = () => {
+    if (!presentation) return;
+    let text = `# ${presentation.title}\n\n`;
+    presentation.slides.forEach((s, i) => {
+      text += `## Slide ${i + 1}: ${s.title}\n\n`;
+      s.bullets.forEach(b => { text += `- ${b}\n`; });
+      if (s.imageDescription) text += `\n[Image: ${s.imageDescription}]\n`;
+      if (s.quote) text += `\n> "${s.quote}" — ${s.quoteAuthor || 'Unknown'}\n`;
+      if (s.stats) { text += '\n'; s.stats.forEach(st => { text += `**${st.value}** — ${st.label}\n`; }); }
+      if (s.steps) { text += '\n'; s.steps.forEach((st, j) => { text += `${j + 1}. **${st.label}**: ${st.description}\n`; }); }
+      if (s.timelineItems) { text += '\n'; s.timelineItems.forEach(t => { text += `- **${t.date}**: ${t.event}\n`; }); }
+      text += `\nNotes: ${s.notes}\n\n---\n\n`;
+    });
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `${presentation.title.replace(/[^a-zA-Z0-9]/g, '_')}.md`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('Downloaded as Markdown');
+  };
+
+  const exportAsHTML = () => {
+    if (!presentation) return;
+    const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${presentation.title}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+.slide{width:100vw;height:100vh;display:flex;flex-direction:column;justify-content:center;padding:8vh 10vw;scroll-snap-align:start}
+.slide h2{font-size:3rem;margin-bottom:1.5rem;color:${schemeColors[0]}}
+.slide h3{font-size:1.5rem;color:${schemeColors[1]};margin-bottom:1rem}
+.slide ul{list-style:none;font-size:1.25rem;line-height:2}
+.slide ul li::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:${schemeColors[2]};margin-right:12px}
+.slide blockquote{font-size:1.75rem;font-style:italic;border-left:4px solid ${schemeColors[0]};padding-left:1.5rem;margin:2rem 0}
+html{scroll-snap-type:y mandatory;overflow-y:scroll}
+</style></head><body>\n`;
+    presentation.slides.forEach(s => {
+      html += `<div class="slide"><h2>${s.title}</h2>\n`;
+      if (s.bullets.length) { html += '<ul>'; s.bullets.forEach(b => { html += `<li>${b}</li>`; }); html += '</ul>\n'; }
+      if (s.quote) html += `<blockquote>"${s.quote}" — ${s.quoteAuthor || ''}</blockquote>\n`;
+      html += '</div>\n';
+    });
+    html += '</body></html>';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `${presentation.title.replace(/[^a-zA-Z0-9]/g, '_')}.html`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('Downloaded as HTML slideshow');
+  };
+
+  const slide = presentation?.slides[currentSlide];
+
+  /* ── Slide Renderer ── */
+
+  const renderSlide = (s: Slide) => {
+    switch (s.layout) {
+      case 'title':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <h3 className="mb-4 text-3xl font-bold text-text-primary sm:text-4xl">{s.title}</h3>
+            {s.bullets[0] && <p className="text-lg text-text-secondary">{s.bullets[0]}</p>}
+            {s.imageDescription && <p className="mt-6 text-sm italic text-text-muted">[{s.imageDescription}]</p>}
+          </div>
+        );
+      case 'quote':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center px-8">
+            <svg className="mb-4 h-8 w-8 text-accent/40" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" /></svg>
+            <blockquote className="mb-4 text-xl font-medium italic text-text-primary sm:text-2xl leading-relaxed">&ldquo;{s.quote}&rdquo;</blockquote>
+            {s.quoteAuthor && <p className="text-sm text-accent">— {s.quoteAuthor}</p>}
+          </div>
+        );
+      case 'comparison':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent">{s.leftLabel || 'Option A'}</h4>
+                <ul className="space-y-2">{(s.leftColumn || []).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item}</li>
+                ))}</ul>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent-secondary">{s.rightLabel || 'Option B'}</h4>
+                <ul className="space-y-2">{(s.rightColumn || []).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-secondary" />{item}</li>
+                ))}</ul>
+              </div>
+            </div>
+          </div>
+        );
+      case 'image_text':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-6">
+                <p className="text-sm italic text-text-muted text-center">{s.imageDescription || 'Image'}</p>
+              </div>
+              <ul className="space-y-3">{s.bullets.map((b, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</li>
+              ))}</ul>
+            </div>
+          </div>
+        );
+      case 'section':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <div className="mb-4 h-1 w-16 rounded-full bg-accent" />
+            <h3 className="text-3xl font-bold text-accent">{s.title}</h3>
+          </div>
+        );
+      case 'timeline':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
+            <div className="relative space-y-4 pl-6 border-l-2 border-accent/30">
+              {(s.timelineItems || []).map((item, i) => (
+                <div key={i} className="relative">
+                  <div className="absolute -left-[25px] top-1 h-3 w-3 rounded-full bg-accent" />
+                  <p className="text-xs font-bold text-accent uppercase tracking-wide">{item.date}</p>
+                  <p className="text-sm text-text-secondary mt-0.5">{item.event}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'stats':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <h3 className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</h3>
+            <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+              {(s.stats || []).map((stat, i) => (
+                <div key={i} className="text-center">
+                  <p className="text-3xl font-bold text-accent">{stat.value}</p>
+                  <p className="mt-1 text-sm text-text-muted">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'steps':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
+            <div className="space-y-4">
+              {(s.steps || []).map((step, i) => (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{i + 1}</div>
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">{step.label}</p>
+                    <p className="text-sm text-text-secondary mt-0.5">{step.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <p className="mb-1 text-xs font-medium text-text-muted uppercase tracking-wide">Slide {currentSlide + 1} of {presentation!.slides.length}</p>
+            <h3 className="mb-6 text-2xl font-bold text-text-primary sm:text-3xl">{s.title}</h3>
+            <div className={s.imageDescription ? 'grid grid-cols-3 gap-6' : ''}>
+              <ul className={`space-y-3 ${s.imageDescription ? 'col-span-2' : ''}`}>
+                {s.bullets.map((b, i) => (
+                  <li key={i} className="flex items-start gap-3 text-base text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</li>
+                ))}
+              </ul>
+              {s.imageDescription && (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-4">
+                  <p className="text-xs italic text-text-muted text-center">{s.imageDescription}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+    }
+  };
+
+  /* ── Pill selector helper ── */
+  const PillSelect = ({ options, value, onChange, columns = '' }: {
+    options: string[];
+    value: string;
+    onChange: (v: string) => void;
+    columns?: string;
+  }) => (
+    <div className={`flex flex-wrap gap-2 ${columns}`}>
+      {options.map(opt => (
+        <button key={opt} onClick={() => onChange(opt)}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${value === opt ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}
+        >{opt}</button>
+      ))}
+    </div>
+  );
+
+  /* ── Render ── */
+
+  return (
+    <motion.div className="mx-auto max-w-5xl" {...fadeInUp}>
+      <div className="mb-8 text-center">
+        <h1 className="mb-2 text-3xl font-bold gradient-text inline-block">Presentation Maker</h1>
+        <p className="text-text-secondary">Create professional presentations in your style</p>
+      </div>
+
+      {!presentation ? (
+        <motion.div className="mx-auto max-w-3xl" variants={staggerContainer} initial="initial" animate="animate">
+          <motion.div className="rounded-xl border border-border bg-bg-card p-6" style={{ boxShadow: 'var(--card-shadow)' }} variants={staggerItem}>
+            <div className="space-y-5">
+              {/* Topic */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">Topic</label>
+                <textarea value={topic} onChange={(e) => setTopic(e.target.value)}
+                  placeholder="What should the presentation be about? Be as specific as you want..."
+                  rows={3}
+                  className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring resize-none" />
+              </div>
+
+              {/* Row: Format + Language */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Format</label>
+                  <select value={format} onChange={(e) => setFormat(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary outline-none focus:border-ring">
+                    {FORMATS.map(f => <option key={f.value} value={f.value}>{f.label} — {f.desc}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Language</label>
+                  <select value={language} onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary outline-none focus:border-ring">
+                    {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row: Level + Audience */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Level</label>
+                  <select value={level} onChange={(e) => setLevel(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary outline-none focus:border-ring">
+                    {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Audience</label>
+                  <select value={audience} onChange={(e) => setAudience(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary outline-none focus:border-ring">
+                    {AUDIENCES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Slide Count */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-text-primary">Slides</label>
+                  <span className="text-sm font-bold text-accent">{slideCount}</span>
+                </div>
+                <input type="range" min={3} max={40} value={slideCount} onChange={(e) => setSlideCount(Number(e.target.value))}
+                  className="w-full accent-accent" />
+                <div className="flex justify-between text-[10px] text-text-muted mt-0.5"><span>3</span><span>40</span></div>
+              </div>
+
+              {/* Style pills */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Style</label>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                  {STYLES.map(s => (
+                    <button key={s.value} onClick={() => setStyle(s.value)}
+                      className={`rounded-lg py-2 px-2 text-center transition-all ${style === s.value ? 'bg-accent text-white ring-2 ring-accent/30' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                      <p className="text-xs font-semibold">{s.value}</p>
+                      <p className="text-[10px] opacity-70 mt-0.5">{s.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tone pills */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Tone</label>
+                <PillSelect options={TONES} value={tone} onChange={setTone} />
+              </div>
+
+              {/* Color Scheme */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Color Scheme</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_SCHEMES.map(c => (
+                    <button key={c.value} onClick={() => setColorScheme(c.value)}
+                      className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${colorScheme === c.value ? 'bg-accent text-white ring-2 ring-accent/30' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                      <span className="flex gap-0.5">
+                        {c.colors.map((col, i) => (
+                          <span key={i} className="h-3 w-3 rounded-full" style={{ backgroundColor: col }} />
+                        ))}
+                      </span>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content Density */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Content Density</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {CONTENT_DENSITY.map(d => (
+                    <button key={d.value} onClick={() => setContentDensity(d.value)}
+                      className={`rounded-lg py-2 text-center transition-all ${contentDensity === d.value ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                      <p className="text-xs font-semibold">{d.label}</p>
+                      <p className="text-[10px] opacity-70">{d.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Images */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Images</label>
+                <div className="flex gap-3">
+                  <button onClick={() => setImageSource('descriptions')}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${imageSource === 'descriptions' ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                    With Descriptions
+                  </button>
+                  <button onClick={() => setImageSource('none')}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${imageSource === 'none' ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                    Text Only
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced Options Toggle */}
+              <button onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex w-full items-center justify-between rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors">
+                <span>Advanced Options</span>
+                <svg className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <AnimatePresence>
+                {showAdvanced && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 overflow-hidden"
+                  >
+                    {/* Transition */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-text-primary">Transition Style</label>
+                      <PillSelect options={TRANSITIONS.map(t => t.label)} value={TRANSITIONS.find(t => t.value === transition)?.label || 'Fade'} onChange={(v) => setTransition(TRANSITIONS.find(t => t.label === v)?.value || 'fade')} />
+                    </div>
+
+                    {/* Include toggles */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-text-primary">Include Special Slides</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: 'Table of Contents', state: includeTOC, set: setIncludeTOC },
+                          { label: 'Summary Slide', state: includeSummary, set: setIncludeSummary },
+                          { label: 'Key Takeaways', state: includeTakeaways, set: setIncludeTakeaways },
+                          { label: 'References', state: includeReferences, set: setIncludeReferences },
+                        ].map(toggle => (
+                          <button key={toggle.label} onClick={() => toggle.set(!toggle.state)}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${toggle.state ? 'bg-accent/10 text-accent border border-accent/30' : 'border border-border text-text-muted hover:bg-bg-hover'}`}>
+                            <span className={`h-3.5 w-3.5 rounded border flex items-center justify-center ${toggle.state ? 'bg-accent border-accent' : 'border-border'}`}>
+                              {toggle.state && <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                            </span>
+                            {toggle.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Instructions */}
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-text-primary">Custom Instructions</label>
+                      <textarea value={customInstructions} onChange={(e) => setCustomInstructions(e.target.value)}
+                        placeholder="Any additional instructions for the AI... (e.g., 'Focus on real-world examples', 'Include data visualizations')"
+                        rows={3}
+                        className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring resize-none" />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Style profile badge */}
+              {hasProfile && (
+                <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2">
+                  <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  <p className="text-xs text-success font-medium">Style profile loaded — {profile.confidence}% confidence</p>
+                </div>
+              )}
+
+              {/* Generate Button */}
+              <button onClick={generatePresentation} disabled={loading || !topic.trim()}
+                className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {loading ? <><LoadingSpinner className="h-4 w-4" /> Generating...</> : 'Generate Presentation'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : (
+        <div>
+          {/* Toolbar */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-text-primary">{presentation.title}</h2>
+            <div className="flex flex-wrap gap-2">
+              {/* View mode buttons */}
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(['slide', 'grid', 'outline'] as const).map(mode => (
+                  <button key={mode} onClick={() => setViewMode(mode)}
+                    className={`px-3 py-1.5 text-xs capitalize transition-colors ${viewMode === mode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-bg-hover'}`}>{mode}</button>
+                ))}
+              </div>
+              <button onClick={() => setShowNotes(!showNotes)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">{showNotes ? 'Hide Notes' : 'Notes'}</button>
+              <button onClick={exportAsText} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Export MD</button>
+              <button onClick={exportAsHTML} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Export HTML</button>
+              <button onClick={toggleFullscreen} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Fullscreen</button>
+              <button onClick={() => setPresentation(null)} className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20">New</button>
+            </div>
+          </div>
+
+          {/* View: Slide */}
+          {viewMode === 'slide' && (
+            <div ref={presentRef} className={fullscreen ? 'fixed inset-0 z-50 flex flex-col bg-bg-primary p-8' : ''}>
+              <AnimatePresence mode="wait">
+                {slide && (
+                  <motion.div
+                    key={currentSlide}
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -30 }}
+                    transition={{ duration: 0.2 }}
+                    className={`rounded-xl border border-border bg-bg-card ${fullscreen ? 'flex-1 flex flex-col justify-center' : 'aspect-video'} p-8 sm:p-12`}
+                    style={{ boxShadow: 'var(--card-shadow)' }}
+                  >
+                    {renderSlide(slide)}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {showNotes && slide && (
+                <div className="mt-3 rounded-lg border border-border bg-bg-secondary p-4">
+                  <p className="text-xs font-medium text-text-muted mb-1">Speaker Notes</p>
+                  <p className="text-sm text-text-secondary">{slide.notes}</p>
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between">
+                <button onClick={() => goToSlide(currentSlide - 1)} disabled={currentSlide === 0}
+                  className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+                <div className="flex gap-1">
+                  {presentation.slides.map((_, i) => (
+                    <button key={i} onClick={() => setCurrentSlide(i)}
+                      className={`h-2 rounded-full transition-all ${i === currentSlide ? 'w-6 bg-accent' : 'w-2 bg-border hover:bg-text-muted'}`} />
+                  ))}
+                </div>
+                <button onClick={() => goToSlide(currentSlide + 1)} disabled={currentSlide >= presentation.slides.length - 1}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+              </div>
+
+              {fullscreen && (
+                <button onClick={toggleFullscreen} className="absolute top-4 right-4 rounded-lg bg-bg-hover p-2 text-text-muted hover:text-text-primary">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* View: Grid */}
+          {viewMode === 'grid' && (
+            <motion.div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
+              {presentation.slides.map((s, i) => (
+                <motion.button key={i} variants={staggerItem} onClick={() => goToSlide(i)}
+                  className={`rounded-xl border p-4 text-left transition-all aspect-video flex flex-col justify-between ${i === currentSlide ? 'border-accent bg-accent/5 ring-2 ring-accent/20' : 'border-border bg-bg-card hover:border-text-muted'}`}
+                  style={{ boxShadow: 'var(--card-shadow)' }}>
+                  <div>
+                    <p className="text-xs font-bold text-text-primary line-clamp-2">{s.title}</p>
+                    {s.bullets[0] && <p className="mt-1 text-[10px] text-text-muted line-clamp-2">{s.bullets[0]}</p>}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-text-muted font-medium uppercase">{s.layout}</span>
+                    <span className="text-[10px] text-text-muted">{i + 1}</span>
+                  </div>
+                </motion.button>
+              ))}
+            </motion.div>
+          )}
+
+          {/* View: Outline */}
+          {viewMode === 'outline' && (
+            <div className="rounded-xl border border-border bg-bg-card p-6 space-y-3" style={{ boxShadow: 'var(--card-shadow)' }}>
+              {presentation.slides.map((s, i) => (
+                <button key={i} onClick={() => goToSlide(i)}
+                  className={`w-full flex items-start gap-4 rounded-lg px-4 py-3 text-left transition-all ${i === currentSlide ? 'bg-accent/10 border border-accent/30' : 'hover:bg-bg-hover border border-transparent'}`}>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-bg-hover text-xs font-bold text-text-muted">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-text-primary">{s.title}</p>
+                    <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
+                      {s.layout === 'quote' ? `"${s.quote}"` : s.bullets.join(' | ')}
+                    </p>
+                    {showNotes && <p className="text-xs text-text-muted mt-1 italic">{s.notes}</p>}
+                  </div>
+                  <span className="shrink-0 rounded-full bg-bg-hover px-2 py-0.5 text-[10px] text-text-muted uppercase">{s.layout}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Thumbnail strip (slide view only) */}
+          {viewMode === 'slide' && (
+            <div className="mt-6 grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
+              {presentation.slides.map((s, i) => (
+                <button key={i} onClick={() => setCurrentSlide(i)}
+                  className={`rounded-lg border p-2 text-left transition-all ${i === currentSlide ? 'border-accent bg-accent/5' : 'border-border hover:border-text-muted'}`}>
+                  <p className="text-[10px] font-bold text-text-primary line-clamp-1">{s.title}</p>
+                  <p className="mt-0.5 text-[8px] text-text-muted">{s.layout}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Keyboard hint */}
+          <p className="mt-4 text-center text-[10px] text-text-muted">Use arrow keys or spacebar to navigate slides</p>
+        </div>
+      )}
+    </motion.div>
+  );
+}
