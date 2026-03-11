@@ -254,6 +254,10 @@ function ExercisesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'custom', essayText: `Generate ${difficulty} exercises for ${subject}`, systemPrompt: prompt, providerConfig: config }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
       const data = await res.json();
 
       let parsed;
@@ -263,15 +267,17 @@ function ExercisesPage() {
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         const result = parseAIJSON<{ exercises: Exercise[] }>(data.raw);
         parsed = result.exercises;
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI returned an empty response — try again.');
       }
 
-      if (parsed && Array.isArray(parsed)) {
+      if (parsed && Array.isArray(parsed) && parsed.length > 0) {
         setExercises(parsed);
         toast.success(`${parsed.length} exercises ready!`);
       } else {
-        throw new Error('Could not parse exercises');
+        throw new Error('Could not parse exercises — try again.');
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate exercises');

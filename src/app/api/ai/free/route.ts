@@ -108,6 +108,12 @@ export async function POST(req: NextRequest) {
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+      if (!text) {
+        return NextResponse.json({ error: 'AI returned an empty response — try again.' }, {
+          status: 500, headers: { 'X-RateLimit-Remaining': String(remaining) }
+        });
+      }
+
       let parsed;
       try {
         parsed = parseAIJSON(text);
@@ -133,6 +139,7 @@ export async function POST(req: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           let buffer = '';
+          let hasContent = false;
           try {
             while (true) {
               const { done, value } = await reader.read();
@@ -145,10 +152,21 @@ export async function POST(req: NextRequest) {
                   try {
                     const json = JSON.parse(line.slice(6));
                     const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    if (text) controller.enqueue(encoder.encode(text));
+                    if (text) { controller.enqueue(encoder.encode(text)); hasContent = true; }
                   } catch { /* skip */ }
                 }
               }
+            }
+            // Flush remaining buffer
+            if (buffer.startsWith('data: ')) {
+              try {
+                const json = JSON.parse(buffer.slice(6));
+                const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (text) { controller.enqueue(encoder.encode(text)); hasContent = true; }
+              } catch { /* skip */ }
+            }
+            if (!hasContent) {
+              controller.enqueue(encoder.encode('\n\n[ERROR]: AI returned an empty response — try again.'));
             }
             controller.close();
           } catch (err) {

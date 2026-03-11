@@ -31,7 +31,9 @@ export function createKimiProvider(apiKey: string, model?: string): AIProvider {
         ],
         max_tokens: 4096,
       });
-      return res.choices[0]?.message?.content || '';
+      const result = res.choices[0]?.message?.content || '';
+      if (!result) throw new Error('Kimi returned an empty response — try again.');
+      return result;
     },
 
     async generate(systemPrompt: string, userPrompt: string, onChunk?: (chunk: string) => void): Promise<string> {
@@ -53,6 +55,7 @@ export function createKimiProvider(apiKey: string, model?: string): AIProvider {
             onChunk(delta);
           }
         }
+        if (!full) throw new Error('Kimi returned an empty response — try again.');
         return full;
       }
       const res = await client.chat.completions.create({
@@ -63,7 +66,9 @@ export function createKimiProvider(apiKey: string, model?: string): AIProvider {
         ],
         max_tokens: 8192,
       });
-      return res.choices[0]?.message?.content || '';
+      const result = res.choices[0]?.message?.content || '';
+      if (!result) throw new Error('Kimi returned an empty response — try again.');
+      return result;
     },
 
     async ocr(): Promise<string> {

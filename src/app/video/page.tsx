@@ -78,6 +78,10 @@ export default function VideoPage() {
           providerConfig: config,
         }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
       const data = await res.json();
 
       let parsed: PodcastScript;
@@ -86,8 +90,10 @@ export default function VideoPage() {
       } else if (data.raw) {
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         parsed = parseAIJSON<PodcastScript>(data.raw);
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI returned an empty response — try again.');
       }
 
       setScript(parsed);

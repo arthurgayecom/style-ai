@@ -82,6 +82,10 @@ export default function LearnPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'custom', essayText: prompt, systemPrompt: GRADING_PROMPT, providerConfig: config }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
       const data = await res.json();
 
       let parsed: GradingResult;
@@ -90,8 +94,10 @@ export default function LearnPage() {
       } else if (data.raw) {
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         parsed = parseAIJSON<GradingResult>(data.raw);
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI returned an empty response — try again.');
       }
       setResult(parsed);
       setTab('grade');
@@ -131,6 +137,11 @@ export default function LearnPage() {
         }),
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Generation failed (${res.status})`);
+      }
+
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No stream');
       const decoder = new TextDecoder();
@@ -138,9 +149,12 @@ export default function LearnPage() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        full += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        if (chunk.includes('[ERROR]:')) throw new Error(chunk.replace(/.*\[ERROR\]:\s*/, ''));
+        full += chunk;
         setImprovedText(full);
       }
+      if (!full.trim()) throw new Error('AI returned an empty response — try again.');
       setTab('improved');
       toast.success('Essay improved!');
     } catch (err: unknown) {

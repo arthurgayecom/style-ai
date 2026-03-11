@@ -81,7 +81,7 @@ export default function WritePage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Generation failed');
       }
 
@@ -95,9 +95,11 @@ export default function WritePage() {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        if (chunk.includes('[ERROR]:')) throw new Error(chunk.replace(/.*\[ERROR\]:\s*/, ''));
         full += chunk;
         setGeneratedText(full);
       }
+      if (!full.trim()) throw new Error('AI returned an empty response — try again.');
 
       // Save generated essay to history
       const wc = full.split(/\s+/).filter(Boolean).length;
@@ -172,6 +174,10 @@ Return ONLY valid JSON (no code blocks):
         }),
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Detection failed (${res.status})`);
+      }
       const data = await res.json();
       let parsed: AIDetectionResult;
       if (data.analysis?.aiScore !== undefined) {
@@ -180,12 +186,12 @@ Return ONLY valid JSON (no code blocks):
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         parsed = parseAIJSON<AIDetectionResult>(data.raw);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI detection failed — try again.');
       }
 
       setDetectionResult(parsed);
     } catch {
-      // Detection is optional
+      // Detection is optional — don't block user
     }
     setScanning(false);
   };

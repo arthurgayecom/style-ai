@@ -358,6 +358,10 @@ export default function PresentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'custom', essayText: userMsg, systemPrompt: prompt, providerConfig: config }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
       const data = await res.json();
 
       let parsed: Presentation;
@@ -366,8 +370,10 @@ export default function PresentPage() {
       } else if (data.raw) {
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         parsed = parseAIJSON<Presentation>(data.raw);
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI returned an empty response — try again.');
       }
 
       parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content' }));

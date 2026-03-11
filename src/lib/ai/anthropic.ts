@@ -13,8 +13,9 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         messages: [{ role: 'user', content: text }],
       });
       const block = msg.content[0];
-      if (!block) return '';
-      return block.type === 'text' ? block.text : '';
+      const result = block?.type === 'text' ? block.text : '';
+      if (!result) throw new Error('Claude returned an empty response — try again.');
+      return result;
     },
 
     async generate(systemPrompt: string, userPrompt: string, onChunk?: (chunk: string) => void): Promise<string> {
@@ -32,6 +33,7 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
             onChunk(event.delta.text);
           }
         }
+        if (!full) throw new Error('Claude returned an empty response — try again.');
         return full;
       }
       const msg = await client.messages.create({
@@ -41,8 +43,9 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         messages: [{ role: 'user', content: userPrompt }],
       });
       const block = msg.content[0];
-      if (!block) return '';
-      return block.type === 'text' ? block.text : '';
+      const result = block?.type === 'text' ? block.text : '';
+      if (!result) throw new Error('Claude returned an empty response — try again.');
+      return result;
     },
 
     async ocr(imageBase64: string, mimeType: string): Promise<string> {
@@ -64,8 +67,9 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         }],
       });
       const block = msg.content[0];
-      if (!block) return '';
-      return block.type === 'text' ? block.text : '';
+      const result = block?.type === 'text' ? block.text : '';
+      if (!result) throw new Error('OCR failed — Claude could not extract text from this image.');
+      return result;
     },
   };
 }

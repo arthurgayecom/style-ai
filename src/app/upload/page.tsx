@@ -147,6 +147,10 @@ export default function UploadPage() {
         }),
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Analysis failed (${res.status})`);
+      }
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
@@ -193,6 +197,11 @@ export default function UploadPage() {
         }),
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Aggregation failed:', err.error || res.status);
+        return;
+      }
       const data = await res.json();
       if (data.error) {
         console.warn('Aggregation failed:', data.error);

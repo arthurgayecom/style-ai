@@ -16,7 +16,9 @@ export function createOllamaProvider(model: string, baseUrl?: string): AIProvide
           { role: 'user', content: text },
         ],
       });
-      return res.choices[0]?.message?.content || '';
+      const result = res.choices[0]?.message?.content || '';
+      if (!result) throw new Error('Ollama returned an empty response — try again.');
+      return result;
     },
 
     async generate(systemPrompt: string, userPrompt: string, onChunk?: (chunk: string) => void): Promise<string> {
@@ -37,6 +39,7 @@ export function createOllamaProvider(model: string, baseUrl?: string): AIProvide
             onChunk(delta);
           }
         }
+        if (!full) throw new Error('Ollama returned an empty response — try again.');
         return full;
       }
       const res = await client.chat.completions.create({
@@ -46,7 +49,9 @@ export function createOllamaProvider(model: string, baseUrl?: string): AIProvide
           { role: 'user', content: userPrompt },
         ],
       });
-      return res.choices[0]?.message?.content || '';
+      const result = res.choices[0]?.message?.content || '';
+      if (!result) throw new Error('Ollama returned an empty response — try again.');
+      return result;
     },
 
     async ocr(): Promise<string> {

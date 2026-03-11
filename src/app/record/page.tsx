@@ -191,13 +191,18 @@ export default function RecordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'custom', essayText: transcript, systemPrompt: VOICE_FILTER_PROMPT, providerConfig: config }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Filter failed (${res.status})`);
+      }
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
       const cleaned = data.raw || data.analysis?.toString() || '';
-      if (cleaned) {
+      if (cleaned.trim()) {
         setTranscript(cleaned);
         toast.success('Student voices filtered out!');
       } else {
-        toast.error('Filter returned empty result');
+        toast.error('Filter returned empty result — try again');
       }
     } catch {
       toast.error('Voice filtering failed');
@@ -225,6 +230,10 @@ export default function RecordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'custom', essayText: combined, systemPrompt: LECTURE_PROMPT, providerConfig: config }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Analysis failed (${res.status})`);
+      }
       const data = await res.json();
 
       let parsed: LectureAnalysis;
@@ -233,8 +242,10 @@ export default function RecordPage() {
       } else if (data.raw) {
         const { parseAIJSON } = await import('@/lib/ai/parseJSON');
         parsed = parseAIJSON<LectureAnalysis>(data.raw);
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error('AI returned an empty response — try again or use a different AI provider');
+        throw new Error('AI returned an empty response — try again.');
       }
 
       setAnalysis(parsed);

@@ -29,7 +29,9 @@ export function createGeminiProvider(apiKey: string, model: string): AIProvider 
       const contents = [{ role: 'user', parts: [{ text }] }];
       const res = await callGemini(contents, systemPrompt);
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (!result) throw new Error('Gemini returned an empty response — the AI may be overloaded. Try again.');
+      return result;
     },
 
     async generate(systemPrompt: string, userPrompt: string, onChunk?: (chunk: string) => void): Promise<string> {
@@ -67,12 +69,23 @@ export function createGeminiProvider(apiKey: string, model: string): AIProvider 
             }
           }
         }
+        // Flush any remaining buffer
+        if (buffer.startsWith('data: ')) {
+          try {
+            const json = JSON.parse(buffer.slice(6));
+            const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) { full += text; onChunk(text); }
+          } catch { /* skip */ }
+        }
+        if (!full) throw new Error('Gemini returned an empty response — the AI may be overloaded. Try again.');
         return full;
       }
 
       const res = await callGemini(contents, systemPrompt);
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (!result) throw new Error('Gemini returned an empty response — the AI may be overloaded. Try again.');
+      return result;
     },
 
     async ocr(imageBase64: string, mimeType: string): Promise<string> {
@@ -85,7 +98,9 @@ export function createGeminiProvider(apiKey: string, model: string): AIProvider 
       }];
       const res = await callGemini(contents);
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (!result) throw new Error('OCR failed — Gemini could not extract text from this image. Try a clearer image.');
+      return result;
     },
   };
 }
