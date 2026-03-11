@@ -24,16 +24,47 @@ export default function LoginPage() {
 
   if (!configured) {
     return (
-      <motion.div className="mx-auto max-w-md mt-20 text-center" {...fadeInUp}>
-        <div className="rounded-xl border border-border bg-bg-card p-8" style={{ boxShadow: 'var(--card-shadow)' }}>
-          <h1 className="text-2xl font-bold text-text-primary mb-3">Accounts Not Set Up</h1>
-          <p className="text-sm text-text-secondary mb-4">
-            Cloud sync requires Supabase. The app works without accounts — your settings are saved locally in your browser.
+      <motion.div className="mx-auto max-w-lg mt-12" {...fadeInUp}>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold gradient-text inline-block">Accounts Coming Soon</h1>
+          <p className="text-text-secondary mt-2">
+            Create an account to sync your API keys across all your devices
           </p>
-          <button onClick={() => router.push('/setup')} className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover">
-            Go to Setup
-          </button>
         </div>
+        <div className="rounded-xl border border-border bg-bg-card p-6" style={{ boxShadow: 'var(--card-shadow)' }}>
+          <div className="space-y-4 text-sm text-text-secondary">
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent text-xs font-bold">1</span>
+              <p>Set up your API keys on your PC (Setup page)</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent text-xs font-bold">2</span>
+              <p>Create an account with email &amp; password</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent text-xs font-bold">3</span>
+              <p>Your API keys auto-sync to the cloud — log in on your phone and everything is there</p>
+            </div>
+          </div>
+          <div className="mt-6 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4">
+            <p className="text-sm text-yellow-400 font-medium mb-1">Not available yet on this deployment</p>
+            <p className="text-xs text-text-muted">
+              The account system needs a database connection to work. The site owner needs to connect Supabase (free) and add the environment variables. Add me on Snap for updates!
+            </p>
+          </div>
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <a href="https://www.snapchat.com/add/arthurgaye24" target="_blank" rel="noopener noreferrer"
+              className="rounded-full bg-yellow-500 px-5 py-2 text-sm font-bold text-black hover:bg-yellow-400 transition-all hover:scale-105">
+              Add @arthurgaye24 for updates
+            </a>
+            <button onClick={() => router.push('/setup')} className="rounded-lg border border-border px-6 py-2 text-sm font-medium text-text-secondary hover:bg-bg-hover">
+              Go to Setup (works without account)
+            </button>
+          </div>
+        </div>
+        <p className="mt-4 text-center text-xs text-text-muted">
+          The app works without an account — settings save locally in your browser.
+        </p>
       </motion.div>
     );
   }
