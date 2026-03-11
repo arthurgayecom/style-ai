@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ connected: false, error: 'Free AI not configured on this server. The site owner needs to add FREE_GEMINI_API_KEYS.' });
         }
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${freeKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${freeKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         if (!res.ok) {
           return NextResponse.json({ connected: false, error: 'Free AI key is invalid or expired' });
         }
-        return NextResponse.json({ connected: true, model: 'gemini-2.5-flash-preview-05-20' });
+        return NextResponse.json({ connected: true, model: 'gemini-2.5-flash' });
       }
 
       case 'anthropic': {

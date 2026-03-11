@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MODEL = 'gemini-2.5-flash-preview-05-20';
+const MODEL = 'gemini-2.5-flash';
 const DAILY_LIMIT = 50;
 
 // In-memory rate limiting (resets on server restart)
