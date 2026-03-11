@@ -14,16 +14,14 @@ export async function POST(req: NextRequest) {
         if (!freeKey) {
           return NextResponse.json({ connected: false, error: 'Free AI not configured on this server. The site owner needs to add FREE_GEMINI_API_KEYS.' });
         }
+        // Use models.get (read-only metadata) instead of generateContent to avoid burning free quota
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${freeKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }], generationConfig: { maxOutputTokens: 10 } }),
-          }
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${freeKey}`
         );
         if (!res.ok) {
-          return NextResponse.json({ connected: false, error: 'Free AI key is invalid or expired' });
+          const errBody = await res.json().catch(() => ({}));
+          const detail = errBody?.error?.message || `HTTP ${res.status}`;
+          return NextResponse.json({ connected: false, error: `Free AI check failed: ${detail}` });
         }
         return NextResponse.json({ connected: true, model: 'gemini-2.5-flash' });
       }
@@ -51,17 +49,9 @@ export async function POST(req: NextRequest) {
       }
 
       case 'gemini': {
-        // Use REST API directly — more reliable than SDK across environments
+        // Use models.get (metadata) instead of generateContent to validate key without burning quota
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Hi' }] }],
-              generationConfig: { maxOutputTokens: 10 },
-            }),
-          }
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash?key=${apiKey}`
         );
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
