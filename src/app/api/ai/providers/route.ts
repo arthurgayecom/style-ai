@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Hi' }],
         });
-        return NextResponse.json({ connected: true, model: 'gpt-4o' });
+        return NextResponse.json({ connected: true, model: 'gpt-4o-mini' });
       }
 
       case 'gemini': {
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Hi' }],
         });
-        return NextResponse.json({ connected: true, model: 'moonshot-v1-32k' });
+        return NextResponse.json({ connected: true, model: 'moonshot-v1-8k' });
       }
 
       case 'ollama': {

@@ -165,7 +165,7 @@ export function AIProviderProvider({ children }: { children: React.ReactNode }) 
               { onConflict: 'user_id,setting_key' }
             );
           }
-        });
+        }).catch(() => { /* cloud sync failed silently — local state is fine */ });
       }
       return updated;
     });
@@ -184,7 +184,7 @@ export function AIProviderProvider({ children }: { children: React.ReactNode }) 
             { onConflict: 'user_id,setting_key' }
           );
         }
-      });
+      }).catch(() => { /* cloud sync failed silently — local state is fine */ });
     }
   }, []);
 

@@ -21,5 +21,9 @@ export function setItem<T>(key: string, value: T): void {
 
 export function removeItem(key: string): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(PREFIX + key);
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    // Ignore errors (e.g. private browsing mode)
+  }
 }

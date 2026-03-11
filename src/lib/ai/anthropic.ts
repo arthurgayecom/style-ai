@@ -13,6 +13,7 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         messages: [{ role: 'user', content: text }],
       });
       const block = msg.content[0];
+      if (!block) return '';
       return block.type === 'text' ? block.text : '';
     },
 
@@ -40,6 +41,7 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         messages: [{ role: 'user', content: userPrompt }],
       });
       const block = msg.content[0];
+      if (!block) return '';
       return block.type === 'text' ? block.text : '';
     },
 
@@ -62,6 +64,7 @@ export function createAnthropicProvider(apiKey: string, model: string): AIProvid
         }],
       });
       const block = msg.content[0];
+      if (!block) return '';
       return block.type === 'text' ? block.text : '';
     },
   };
