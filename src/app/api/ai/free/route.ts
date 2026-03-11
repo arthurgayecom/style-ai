@@ -8,8 +8,7 @@ const DAILY_LIMIT = 50;
 // In-memory rate limiting (resets on server restart)
 const usageMap = new Map<string, { count: number; date: string }>();
 
-function getApiKeys(): string[] {
-  // Support both new comma-separated format and legacy single key
+function getGeminiKeys(): string[] {
   const multi = process.env.FREE_GEMINI_API_KEYS;
   if (multi) return multi.split(',').map(k => k.trim()).filter(Boolean);
   const single = process.env.FREE_GEMINI_API_KEY;
@@ -17,20 +16,16 @@ function getApiKeys(): string[] {
   return [];
 }
 
-// Round-robin key selection for load balancing
-let keyIndex = 0;
-function getNextKey(): string {
-  const keys = getApiKeys();
-  if (keys.length === 0) throw new Error('Free AI not configured. Set FREE_GEMINI_API_KEYS in environment.');
-  const key = keys[keyIndex % keys.length];
-  keyIndex++;
-  return key;
+function getKimiKey(): string | null {
+  return process.env.DEFAULT_KIMI_API_KEY?.trim() || null;
 }
+
+// Round-robin index for Gemini keys
+let keyIndex = 0;
 
 function getClientId(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
-  const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
-  return ip;
+  return forwarded?.split(',')[0]?.trim() || 'unknown';
 }
 
 function checkRateLimit(clientId: string): { allowed: boolean; remaining: number } {
@@ -50,27 +45,116 @@ function checkRateLimit(clientId: string): { allowed: boolean; remaining: number
   return { allowed: true, remaining: DAILY_LIMIT - usage.count };
 }
 
-async function callGemini(contents: unknown[], systemInstruction?: string, stream = false) {
-  const apiKey = getNextKey();
+// Try each Gemini key in sequence — if one hits quota, try the next
+async function callGeminiWithRetry(contents: unknown[], systemInstruction?: string, stream = false) {
+  const keys = getGeminiKeys();
+  if (keys.length === 0) throw new Error('NO_GEMINI_KEYS');
 
   const body: Record<string, unknown> = { contents, generationConfig: { maxOutputTokens: 8192 } };
   if (systemInstruction) {
     body.systemInstruction = { parts: [{ text: systemInstruction }] };
   }
-
+  const bodyStr = JSON.stringify(body);
   const endpoint = stream ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
-  const res = await fetch(`${GEMINI_BASE}/${MODEL}:${endpoint}key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
 
-  if (!res.ok) {
+  // Try each key starting from round-robin index
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (keyIndex + i) % keys.length;
+    const apiKey = keys[idx];
+
+    const res = await fetch(`${GEMINI_BASE}/${MODEL}:${endpoint}key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr,
+    });
+
+    if (res.ok) {
+      keyIndex = idx + 1; // next call starts from next key
+      return { source: 'gemini' as const, res };
+    }
+
+    // Check if it's a quota/rate-limit error — try next key
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `AI error (${res.status})`);
+    const msg = err?.error?.message || '';
+    const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+
+    if (isQuota && i < keys.length - 1) {
+      continue; // try next key
+    }
+
+    // Not a quota error or last key — throw
+    throw new Error(msg || `Gemini API error (${res.status})`);
   }
 
-  return res;
+  // All keys exhausted
+  throw new Error('GEMINI_QUOTA_EXHAUSTED');
+}
+
+// Kimi/NVIDIA fallback for when all Gemini keys are rate-limited
+async function callKimiFallback(contents: unknown[], systemInstruction?: string) {
+  const kimiKey = getKimiKey();
+  if (!kimiKey) throw new Error('All AI keys exhausted. Try again in a minute.');
+
+  const OpenAI = (await import('openai')).default;
+
+  // NVIDIA NIM key
+  if (kimiKey.startsWith('nvapi-')) {
+    const client = new OpenAI({ apiKey: kimiKey, baseURL: 'https://integrate.api.nvidia.com/v1' });
+    const userText = (contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts?.[0]?.text || '';
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+    if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
+    messages.push({ role: 'user', content: userText });
+
+    const res = await client.chat.completions.create({
+      model: 'meta/llama-3.1-8b-instruct',
+      messages,
+      max_tokens: 8192,
+    });
+    const text = res.choices[0]?.message?.content || '';
+    if (!text) throw new Error('Backup AI returned an empty response — try again.');
+    return { source: 'kimi' as const, text };
+  }
+
+  // Moonshot key
+  const client = new OpenAI({ apiKey: kimiKey, baseURL: 'https://api.moonshot.cn/v1' });
+  const userText = (contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts?.[0]?.text || '';
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+  if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
+  messages.push({ role: 'user', content: userText });
+
+  const res = await client.chat.completions.create({
+    model: 'moonshot-v1-8k',
+    messages,
+    max_tokens: 8192,
+  });
+  const text = res.choices[0]?.message?.content || '';
+  if (!text) throw new Error('Backup AI returned an empty response — try again.');
+  return { source: 'kimi' as const, text };
+}
+
+// Kimi streaming fallback
+async function callKimiFallbackStream(contents: unknown[], systemInstruction?: string) {
+  const kimiKey = getKimiKey();
+  if (!kimiKey) throw new Error('All AI keys exhausted. Try again in a minute.');
+
+  const OpenAI = (await import('openai')).default;
+  const isNvidia = kimiKey.startsWith('nvapi-');
+  const client = new OpenAI({
+    apiKey: kimiKey,
+    baseURL: isNvidia ? 'https://integrate.api.nvidia.com/v1' : 'https://api.moonshot.cn/v1',
+  });
+
+  const userText = (contents as Array<{ parts: Array<{ text: string }> }>)[0]?.parts?.[0]?.text || '';
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+  if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
+  messages.push({ role: 'user', content: userText });
+
+  return client.chat.completions.create({
+    model: isNvidia ? 'meta/llama-3.1-8b-instruct' : 'moonshot-v1-8k',
+    messages,
+    max_tokens: 8192,
+    stream: true,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -104,9 +188,28 @@ export async function POST(req: NextRequest) {
 
     if (mode === 'analyze') {
       const contents = [{ role: 'user', parts: [{ text: essayText }] }];
-      const res = await callGemini(contents, systemPrompt);
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      let text = '';
+      try {
+        const result = await callGeminiWithRetry(contents, systemPrompt);
+        const data = await result.res.json();
+        text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        // If all Gemini keys are exhausted, fall back to Kimi
+        if (msg === 'GEMINI_QUOTA_EXHAUSTED' || msg === 'NO_GEMINI_KEYS') {
+          try {
+            const fallback = await callKimiFallback(contents, systemPrompt);
+            text = fallback.text;
+          } catch {
+            return NextResponse.json({ error: 'All free AI providers are temporarily rate-limited. Try again in ~60 seconds.' }, {
+              status: 503, headers: { 'X-RateLimit-Remaining': String(remaining) }
+            });
+          }
+        } else {
+          throw err;
+        }
+      }
 
       if (!text) {
         return NextResponse.json({ error: 'AI returned an empty response — try again.' }, {
@@ -129,12 +232,62 @@ export async function POST(req: NextRequest) {
 
     if (mode === 'generate') {
       const contents = [{ role: 'user', parts: [{ text: userPrompt }] }];
-      const res = await callGemini(contents, systemPrompt, true);
+      const encoder = new TextEncoder();
 
-      const reader = res.body?.getReader();
+      // Try Gemini first
+      let geminiStream: Response | null = null;
+      let useKimiFallback = false;
+      try {
+        const result = await callGeminiWithRetry(contents, systemPrompt, true);
+        geminiStream = result.res;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        if (msg === 'GEMINI_QUOTA_EXHAUSTED' || msg === 'NO_GEMINI_KEYS') {
+          useKimiFallback = true;
+        } else {
+          throw err;
+        }
+      }
+
+      if (useKimiFallback) {
+        // Stream from Kimi/NVIDIA instead
+        try {
+          const kimiStream = await callKimiFallbackStream(contents, systemPrompt);
+          const stream = new ReadableStream({
+            async start(controller) {
+              let hasContent = false;
+              try {
+                for await (const chunk of kimiStream) {
+                  const delta = chunk.choices[0]?.delta?.content || '';
+                  if (delta) { controller.enqueue(encoder.encode(delta)); hasContent = true; }
+                }
+                if (!hasContent) {
+                  controller.enqueue(encoder.encode('\n\n[ERROR]: AI returned an empty response — try again.'));
+                }
+                controller.close();
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Stream error';
+                controller.enqueue(encoder.encode(`\n\n[ERROR]: ${msg}`));
+                controller.close();
+              }
+            },
+          });
+          return new Response(stream, {
+            headers: {
+              'Content-Type': 'text/plain; charset=utf-8',
+              'Transfer-Encoding': 'chunked',
+              'X-RateLimit-Remaining': String(remaining),
+            },
+          });
+        } catch {
+          return NextResponse.json({ error: 'All free AI providers are temporarily rate-limited. Try again in ~60 seconds.' }, { status: 503 });
+        }
+      }
+
+      // Gemini stream
+      const reader = geminiStream!.body?.getReader();
       if (!reader) throw new Error('No stream');
 
-      const encoder = new TextEncoder();
       const decoder = new TextDecoder();
       const stream = new ReadableStream({
         async start(controller) {

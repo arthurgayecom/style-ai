@@ -62,6 +62,11 @@ export async function POST(req: NextRequest) {
       }
 
       case 'claude-cli': {
+        // Claude CLI only works when running locally (npm run dev), not on Vercel
+        const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+        if (isServerless) {
+          return NextResponse.json({ connected: false, error: 'Claude CLI only works when running locally (npm run dev). Use Free AI or an API key on this hosted site.' });
+        }
         const { spawn } = await import('child_process');
         const result = await new Promise<boolean>((resolve) => {
           try {
@@ -76,7 +81,7 @@ export async function POST(req: NextRequest) {
         if (result) {
           return NextResponse.json({ connected: true, model: 'claude-cli' });
         }
-        return NextResponse.json({ connected: false, error: 'Claude CLI not found in PATH' });
+        return NextResponse.json({ connected: false, error: 'Claude CLI not found. Install Claude Code first: npm install -g @anthropic-ai/claude-code' });
       }
 
       case 'kimi': {
@@ -110,6 +115,10 @@ export async function POST(req: NextRequest) {
       }
 
       case 'ollama': {
+        const isServerless2 = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+        if (isServerless2) {
+          return NextResponse.json({ connected: false, error: 'Ollama only works when running locally (npm run dev). Use Free AI or an API key on this hosted site.' });
+        }
         const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
         if (!res.ok) throw new Error('Ollama not responding');
         const data = await res.json();
