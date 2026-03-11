@@ -144,10 +144,7 @@ export default function PricingPage() {
 
       <div className="mt-12 text-center">
         <p className="text-2xl font-bold gradient-text inline-block">
-          Arthur wants MONEYYYYYYYY
-        </p>
-        <p className="text-sm text-text-muted mt-2">
-          I&apos;m too lazy to work on this yet tho
+          I&apos;m too lazy to code this rn
         </p>
         <p className="text-xs text-text-muted mt-4">
           Currently in beta — all Pro features are available for free during the beta period.

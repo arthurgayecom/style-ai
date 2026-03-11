@@ -254,25 +254,25 @@ function isGradientSlide(layout: string): boolean {
   return GRADIENT_LAYOUTS.has(layout);
 }
 
-// jacobppt/lourrutia.ppt: morph = smooth scale+fade, push = slides push each other, cinematic = dramatic zoom+rotate
+// jacobppt/lourrutia.ppt morph: old slide zooms out + fades, new slide zooms in from slightly smaller — feels like camera dolly
 const TRANSITION_VARIANTS: Record<string, { in: Record<string, number>; out: Record<string, number> }> = {
-  morph:     { in: { opacity: 0, scale: 0.88, y: 40 },   out: { opacity: 0, scale: 1.12, y: -40 } },
-  fade:      { in: { opacity: 0 },                        out: { opacity: 0 } },
-  slide:     { in: { opacity: 0, x: 120 },                out: { opacity: 0, x: -120 } },
-  zoom:      { in: { opacity: 0, scale: 0.6 },            out: { opacity: 0, scale: 1.4 } },
-  push:      { in: { opacity: 0, x: 300 },                out: { opacity: 0, x: -300 } },
-  cinematic: { in: { opacity: 0, scale: 0.7, rotate: -2 }, out: { opacity: 0, scale: 1.3, rotate: 2 } },
-  none:      { in: {},                                     out: {} },
+  morph:     { in: { opacity: 0, scale: 0.75, y: 60 },    out: { opacity: 0, scale: 1.25, y: -60 } },
+  fade:      { in: { opacity: 0 },                         out: { opacity: 0 } },
+  slide:     { in: { opacity: 0, x: 200 },                 out: { opacity: 0, x: -200 } },
+  zoom:      { in: { opacity: 0, scale: 0.4 },             out: { opacity: 0, scale: 1.6 } },
+  push:      { in: { opacity: 0, x: 400 },                 out: { opacity: 0, x: -400 } },
+  cinematic: { in: { opacity: 0, scale: 0.6, rotate: -3 }, out: { opacity: 0, scale: 1.4, rotate: 3 } },
+  none:      { in: {},                                      out: {} },
 };
 
-// Per-transition timing: morph is smooth spring, push is snappy, cinematic is dramatic slow
+// Morph: smooth and luxurious (longer, more damped), push: snappy, cinematic: dramatic slow
 const TRANSITION_TIMING: Record<string, object> = {
-  morph:     { type: 'spring', stiffness: 120, damping: 20, mass: 1 },
-  fade:      { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
-  slide:     { type: 'spring', stiffness: 180, damping: 26 },
-  zoom:      { type: 'spring', stiffness: 100, damping: 18 },
-  push:      { type: 'spring', stiffness: 250, damping: 30 },
-  cinematic: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  morph:     { type: 'spring', stiffness: 80, damping: 18, mass: 1.2 },
+  fade:      { duration: 0.6, ease: [0.4, 0, 0.2, 1] },
+  slide:     { type: 'spring', stiffness: 150, damping: 22 },
+  zoom:      { type: 'spring', stiffness: 80, damping: 16 },
+  push:      { type: 'spring', stiffness: 200, damping: 28 },
+  cinematic: { duration: 1, ease: [0.22, 1, 0.36, 1] },
   none:      { duration: 0 },
 };
 
@@ -828,20 +828,29 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
       case 'comparison':
         return (
           <div className="flex h-full flex-col justify-center">
-            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-6 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
             <div className="grid grid-cols-2 gap-6">
-              <div className="rounded-xl bg-bg-secondary p-5">
-                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-accent">{s.leftLabel || 'Option A'}</h4>
-                <ul className="space-y-2">{(s.leftColumn || []).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item}</li>
+              <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.15 }}
+                className="rounded-2xl bg-bg-secondary/80 backdrop-blur-sm p-6 shadow-lg border-t-4" style={{ borderTopColor: schemeColors[0] }}>
+                <h4 className="mb-4 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[0] }}>{s.leftLabel || 'Option A'}</h4>
+                <ul className="space-y-3">{(s.leftColumn || []).map((item, i) => (
+                  <motion.li key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + i * 0.08 }}
+                    className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[0] }} />{item}</motion.li>
                 ))}</ul>
-              </div>
-              <div className="rounded-xl bg-bg-secondary p-5">
-                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-accent-secondary">{s.rightLabel || 'Option B'}</h4>
-                <ul className="space-y-2">{(s.rightColumn || []).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-secondary" />{item}</li>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.25 }}
+                className="rounded-2xl bg-bg-secondary/80 backdrop-blur-sm p-6 shadow-lg border-t-4" style={{ borderTopColor: schemeColors[1] }}>
+                <h4 className="mb-4 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[1] }}>{s.rightLabel || 'Option B'}</h4>
+                <ul className="space-y-3">{(s.rightColumn || []).map((item, i) => (
+                  <motion.li key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.08 }}
+                    className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[1] }} />{item}</motion.li>
                 ))}</ul>
-              </div>
+              </motion.div>
             </div>
           </div>
         );
@@ -899,14 +908,15 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
       case 'stats':
         return (
           <div className="flex h-full flex-col justify-center">
-            <h3 className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</h3>
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+            <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
               {(s.stats || []).map((stat, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 40, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.15 }}
-                  className="text-center rounded-xl bg-bg-secondary/80 backdrop-blur-sm p-4 shadow-lg">
-                  <p className="text-3xl font-extrabold" style={{ color: schemeColors[0] }}>{stat.value}</p>
-                  <p className="mt-1 text-sm text-text-muted">{stat.label}</p>
+                <motion.div key={i} initial={{ opacity: 0, y: 50, scale: 0.7 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 100, damping: 14, delay: 0.15 + i * 0.12 }}
+                  className="text-center rounded-2xl bg-bg-secondary/90 backdrop-blur-md p-6 shadow-xl border border-border/30 hover:scale-105 transition-transform">
+                  <p className="text-4xl font-extrabold mb-1" style={{ color: schemeColors[i % schemeColors.length] }}>{stat.value}</p>
+                  <p className="text-xs text-text-muted font-medium uppercase tracking-wide">{stat.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -1116,6 +1126,12 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                 </div>
               </div>
 
+              {/* Transition Style — always visible */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text-primary">Transition</label>
+                <PillSelect options={TRANSITIONS.map(t => t.label)} value={TRANSITIONS.find(t => t.value === transition)?.label || 'Morph'} onChange={(v) => setTransition(TRANSITIONS.find(t => t.label === v)?.value || 'morph')} />
+              </div>
+
               {/* Advanced Options Toggle */}
               <button onClick={() => setShowAdvanced(!showAdvanced)}
                 className="flex w-full items-center justify-between rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors">
@@ -1133,12 +1149,6 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                     exit={{ opacity: 0, height: 0 }}
                     className="space-y-4 overflow-hidden"
                   >
-                    {/* Transition */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-text-primary">Transition Style</label>
-                      <PillSelect options={TRANSITIONS.map(t => t.label)} value={TRANSITIONS.find(t => t.value === transition)?.label || 'Fade'} onChange={(v) => setTransition(TRANSITIONS.find(t => t.label === v)?.value || 'fade')} />
-                    </div>
-
                     {/* Include toggles */}
                     <div>
                       <label className="mb-2 block text-sm font-medium text-text-primary">Include Special Slides</label>
@@ -1219,25 +1229,23 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
           {/* View: Slide */}
           {viewMode === 'slide' && (
             <div ref={presentRef} className={fullscreen ? 'fixed inset-0 z-50 flex flex-col bg-bg-primary p-8' : ''}>
-              {/* True morph: slides overlap during transition (like PowerPoint morph) */}
-              <div className={`relative ${fullscreen ? 'flex-1' : 'aspect-video'}`}>
-                <AnimatePresence>
-                  {slide && (
-                    <motion.div
-                      key={currentSlide}
-                      initial={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.in || {}) }}
-                      animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
-                      exit={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.out || {}) }}
-                      transition={TRANSITION_TIMING[transition] || { duration: 0.5 }}
-                      className={`absolute inset-0 rounded-xl ${isGradientSlide(slide.layout) ? '' : 'border border-border bg-bg-card'} p-8 sm:p-12 overflow-hidden`}
-                      style={{
-                        boxShadow: 'var(--card-shadow)',
-                        ...(getSlideBackground(slide.layout, schemeColors) ? { background: getSlideBackground(slide.layout, schemeColors) } : {}),
-                      }}
-                    >
-                      <div className="h-full">{renderSlide(slide)}</div>
-                    </motion.div>
-                  )}
+              {/* True morph: slides overlap during transition (like PowerPoint morph) — both visible simultaneously */}
+              <div className={`relative ${fullscreen ? 'flex-1' : 'aspect-video'} overflow-hidden rounded-xl`}>
+                <AnimatePresence mode="popLayout">
+                  <motion.div
+                    key={currentSlide}
+                    initial={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.in || {}) }}
+                    animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.out || {}) }}
+                    transition={TRANSITION_TIMING[transition] || { duration: 0.5 }}
+                    className={`absolute inset-0 rounded-xl ${isGradientSlide(slide?.layout || 'content') ? '' : 'border border-border/50'} p-8 sm:p-12 overflow-hidden`}
+                    style={{
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+                      background: getSlideBackground(slide?.layout || 'content', schemeColors) || 'var(--bg-card)',
+                    }}
+                  >
+                    {slide && <div className="h-full">{renderSlide(slide)}</div>}
+                  </motion.div>
                 </AnimatePresence>
               </div>
 
