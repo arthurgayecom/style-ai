@@ -90,15 +90,27 @@ export async function POST(req: NextRequest) {
       }
 
       case 'kimi': {
-        // Check key format first
-        if (apiKey && !apiKey.startsWith('sk-')) {
-          return NextResponse.json({
-            connected: false,
-            error: `Invalid key format. Kimi (Moonshot) keys start with "sk-". Your key starts with "${apiKey.slice(0, 6)}..." which looks like a different provider's key.`,
-          });
+        // Use provided key or fall back to server default
+        const effectiveKey = apiKey || process.env.DEFAULT_KIMI_API_KEY;
+        if (!effectiveKey) {
+          return NextResponse.json({ connected: false, error: 'No API key provided and no default Kimi key configured.' });
         }
+
+        // Detect NVIDIA NIM keys vs Moonshot keys
+        if (effectiveKey.startsWith('nvapi-')) {
+          const OpenAI = (await import('openai')).default;
+          const client = new OpenAI({ apiKey: effectiveKey, baseURL: 'https://integrate.api.nvidia.com/v1' });
+          await client.chat.completions.create({
+            model: 'meta/llama-3.1-8b-instruct',
+            max_tokens: 10,
+            messages: [{ role: 'user', content: 'Hi' }],
+          });
+          return NextResponse.json({ connected: true, model: 'meta/llama-3.1-8b-instruct' });
+        }
+
+        // Moonshot keys
         const OpenAI = (await import('openai')).default;
-        const client = new OpenAI({ apiKey, baseURL: 'https://api.moonshot.cn/v1' });
+        const client = new OpenAI({ apiKey: effectiveKey, baseURL: 'https://api.moonshot.cn/v1' });
         await client.chat.completions.create({
           model: 'moonshot-v1-8k',
           max_tokens: 10,

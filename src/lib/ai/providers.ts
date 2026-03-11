@@ -33,7 +33,9 @@ export function createProvider(config: ProviderConfig): AIProvider {
     }
     case 'kimi': {
       const { createKimiProvider } = require('./kimi');
-      return createKimiProvider(config.apiKey!, model);
+      const kimiKey = config.apiKey || process.env.DEFAULT_KIMI_API_KEY;
+      if (!kimiKey) throw new Error('No Kimi API key provided and no default key configured.');
+      return createKimiProvider(kimiKey, model);
     }
     case 'ollama': {
       const { createOllamaProvider } = require('./ollama');

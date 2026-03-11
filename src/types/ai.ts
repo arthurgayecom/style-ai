@@ -66,12 +66,12 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   },
   kimi: {
     type: 'kimi',
-    name: 'Kimi (Moonshot)',
-    description: 'Moonshot AI — 128k context, great for long documents',
-    models: ['moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
-    defaultModel: 'moonshot-v1-32k',
+    name: 'Kimi (AI)',
+    description: 'Powered by NVIDIA NIM — fast and capable, works out of the box',
+    models: ['meta/llama-3.1-8b-instruct', 'moonshot-v1-128k', 'moonshot-v1-32k'],
+    defaultModel: 'meta/llama-3.1-8b-instruct',
     supportsVision: false,
-    requiresApiKey: true,
+    requiresApiKey: false,
   },
   ollama: {
     type: 'ollama',

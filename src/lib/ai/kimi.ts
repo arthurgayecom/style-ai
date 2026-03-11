@@ -1,13 +1,30 @@
 import OpenAI from 'openai';
 import type { AIProvider } from './types';
 
-export function createKimiProvider(apiKey: string, model: string): AIProvider {
-  const client = new OpenAI({ apiKey, baseURL: 'https://api.moonshot.cn/v1' });
+function getBaseConfig(apiKey: string) {
+  // NVIDIA NIM keys start with nvapi-
+  if (apiKey.startsWith('nvapi-')) {
+    return {
+      baseURL: 'https://integrate.api.nvidia.com/v1',
+      defaultModel: 'meta/llama-3.1-8b-instruct',
+    };
+  }
+  // Default: Moonshot AI
+  return {
+    baseURL: 'https://api.moonshot.cn/v1',
+    defaultModel: 'moonshot-v1-32k',
+  };
+}
+
+export function createKimiProvider(apiKey: string, model?: string): AIProvider {
+  const config = getBaseConfig(apiKey);
+  const useModel = model || config.defaultModel;
+  const client = new OpenAI({ apiKey, baseURL: config.baseURL });
 
   return {
     async analyze(text: string, systemPrompt: string): Promise<string> {
       const res = await client.chat.completions.create({
-        model,
+        model: useModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text },
@@ -21,7 +38,7 @@ export function createKimiProvider(apiKey: string, model: string): AIProvider {
       if (onChunk) {
         let full = '';
         const stream = await client.chat.completions.create({
-          model,
+          model: useModel,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -39,7 +56,7 @@ export function createKimiProvider(apiKey: string, model: string): AIProvider {
         return full;
       }
       const res = await client.chat.completions.create({
-        model,
+        model: useModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

@@ -106,9 +106,9 @@ export default function DashboardPage() {
             👻
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text-primary mb-0.5">Got ideas? Want to help keep CDL Study free?</p>
+            <p className="text-sm font-semibold text-text-primary mb-0.5">Help keep CDL Study free for everyone!</p>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Donate spare Google accounts for free AI credits, report bugs, or suggest features — add me on Snapchat!
+              Got ideas for the app? Have spare Google accounts I can use so everyone gets more free AI tokens? Add me on Snap!
             </p>
           </div>
           <a
