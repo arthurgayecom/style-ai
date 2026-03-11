@@ -142,7 +142,7 @@ function buildPrompt(opts: {
   colorScheme: string; contentDensity: string; transition: string;
   includeTOC: boolean; includeSummary: boolean; includeTakeaways: boolean;
   includeReferences: boolean; customInstructions: string;
-  styleSection: string;
+  styleSection: string; matchMyStyle: boolean; humanize: boolean;
 }) {
   const densityMap: Record<string, string> = {
     brief: 'Keep slides concise with only 2-3 key bullet points each. Less text, more impact.',
@@ -171,8 +171,18 @@ ${opts.imageSource === 'descriptions' ? 'Include "imageDescription" for relevant
 ${specialSlides ? `\nSPECIAL SLIDES:${specialSlides}` : ''}
 ${opts.customInstructions ? `\nCUSTOM INSTRUCTIONS:\n${opts.customInstructions}` : ''}
 
-WRITING STYLE:
+${opts.matchMyStyle ? `WRITING STYLE (IMPORTANT — match this closely):
 ${opts.styleSection}
+Adapt your vocabulary, sentence rhythm, and tone to match the writer's authentic voice. Every slide should sound like THEM, not like AI.` : `WRITING STYLE:
+${opts.styleSection}`}
+${opts.humanize ? `
+HUMANIZE (CRITICAL):
+- Write like a real person, NOT like AI. Use natural, conversational phrasing.
+- NEVER use these AI-giveaway words: "delve", "comprehensive", "moreover", "furthermore", "pivotal", "groundbreaking", "utilize", "leverage", "robust", "streamline", "facilitate", "paradigm", "synergy", "holistic", "cutting-edge", "innovative"
+- Use contractions (don't, it's, we're). Use informal transitions (so, basically, here's the thing).
+- Include personal touches: opinions, real examples, slight imperfections.
+- Vary sentence length. Short punchy statements mixed with longer ones.
+- Use specific numbers and examples instead of vague claims.` : ''}
 
 AVAILABLE LAYOUTS (21 total — you MUST use at least 8 different layout types, NEVER use the same layout 3 times in a row):
 
@@ -254,25 +264,26 @@ function isGradientSlide(layout: string): boolean {
   return GRADIENT_LAYOUTS.has(layout);
 }
 
-// jacobppt/lourrutia.ppt morph: old slide zooms out + fades, new slide zooms in from slightly smaller — feels like camera dolly
+// PowerPoint-style morph: subtle scale + position shift creates depth illusion
+// jacobppt/lourrutia.ppt technique: incoming slide gently rises into view while outgoing fades back
 const TRANSITION_VARIANTS: Record<string, { in: Record<string, number>; out: Record<string, number> }> = {
-  morph:     { in: { opacity: 0, scale: 0.75, y: 60 },    out: { opacity: 0, scale: 1.25, y: -60 } },
+  morph:     { in: { opacity: 0, scale: 0.92, y: 30 },    out: { opacity: 0, scale: 1.06, y: -20 } },
   fade:      { in: { opacity: 0 },                         out: { opacity: 0 } },
-  slide:     { in: { opacity: 0, x: 200 },                 out: { opacity: 0, x: -200 } },
-  zoom:      { in: { opacity: 0, scale: 0.4 },             out: { opacity: 0, scale: 1.6 } },
-  push:      { in: { opacity: 0, x: 400 },                 out: { opacity: 0, x: -400 } },
-  cinematic: { in: { opacity: 0, scale: 0.6, rotate: -3 }, out: { opacity: 0, scale: 1.4, rotate: 3 } },
+  slide:     { in: { opacity: 0, x: 120 },                 out: { opacity: 0, x: -120 } },
+  zoom:      { in: { opacity: 0, scale: 0.6 },             out: { opacity: 0, scale: 1.3 } },
+  push:      { in: { opacity: 0, x: 300 },                 out: { opacity: 0, x: -300 } },
+  cinematic: { in: { opacity: 0, scale: 0.85, rotate: -1.5 }, out: { opacity: 0, scale: 1.1, rotate: 1.5 } },
   none:      { in: {},                                      out: {} },
 };
 
-// Morph: smooth and luxurious (longer, more damped), push: snappy, cinematic: dramatic slow
+// Smooth, luxurious timing — high damping = no bounce, clean settle
 const TRANSITION_TIMING: Record<string, object> = {
-  morph:     { type: 'spring', stiffness: 80, damping: 18, mass: 1.2 },
-  fade:      { duration: 0.6, ease: [0.4, 0, 0.2, 1] },
-  slide:     { type: 'spring', stiffness: 150, damping: 22 },
-  zoom:      { type: 'spring', stiffness: 80, damping: 16 },
-  push:      { type: 'spring', stiffness: 200, damping: 28 },
-  cinematic: { duration: 1, ease: [0.22, 1, 0.36, 1] },
+  morph:     { type: 'spring', stiffness: 120, damping: 28, mass: 0.8 },
+  fade:      { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] },
+  slide:     { type: 'spring', stiffness: 180, damping: 30 },
+  zoom:      { type: 'spring', stiffness: 100, damping: 24 },
+  push:      { type: 'spring', stiffness: 220, damping: 32 },
+  cinematic: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
   none:      { duration: 0 },
 };
 
@@ -303,6 +314,8 @@ export default function PresentPage() {
   const [includeReferences, setIncludeReferences] = useState(false);
   const [customInstructions, setCustomInstructions] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [matchMyStyle, setMatchMyStyle] = useState(true);
+  const [humanize, setHumanize] = useState(true);
 
   // Viewer
   const [presentation, setPresentation] = useState<Presentation | null>(null);
@@ -349,7 +362,7 @@ export default function PresentPage() {
         language, style, format, level, tone, imageSource, slideCount, audience,
         colorScheme, contentDensity, transition,
         includeTOC, includeSummary, includeTakeaways, includeReferences,
-        customInstructions, styleSection,
+        customInstructions, styleSection, matchMyStyle, humanize,
       });
       const userMsg = `Topic: ${topic}\n\nCreate the presentation.`;
 
@@ -382,21 +395,17 @@ export default function PresentPage() {
       if (imageSource === 'descriptions') {
         const slidesWithImages = parsed.slides.filter(s => s.imageDescription);
         const imagePromises = slidesWithImages.map(async (s) => {
-          // Use more descriptive query — take key nouns
-          const desc = s.imageDescription!;
-          const query = desc.split(' ').slice(0, 5).join(' ');
           try {
-            // Try Unsplash source first
-            const imgUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(query)}&sig=${Date.now() + Math.random()}`;
-            s.imageUrl = imgUrl;
-          } catch {
-            try {
-              // Fallback: try simpler query
-              const simpleQuery = desc.split(' ').slice(0, 2).join(' ');
-              s.imageUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(simpleQuery)}&sig=${Date.now()}`;
-            } catch {
-              // Leave as description if all image fetches fail
+            const desc = s.imageDescription!;
+            const res = await fetch(`/api/images?q=${encodeURIComponent(desc)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.images?.[0]?.url) {
+                s.imageUrl = data.images[0].url;
+              }
             }
+          } catch {
+            // Leave as description if image fetch fails
           }
         });
         await Promise.all(imagePromises);
@@ -562,16 +571,23 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
       case 'title':
         return (
           <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden">
-            <motion.div className="absolute top-6 right-8 w-32 h-32 rounded-full opacity-10"
-              animate={{ y: [0, -12, 0], scale: [1, 1.05, 1] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            {/* Floating decorative shapes — pptgem/jacobppt signature */}
+            <motion.div className="absolute top-6 right-8 w-36 h-36 rounded-full opacity-[0.08]"
+              animate={{ y: [0, -12, 0], scale: [1, 1.08, 1] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               style={{ background: schemeColors[2] }} />
-            <motion.div className="absolute bottom-8 left-6 w-20 h-20 rounded-full opacity-10"
+            <motion.div className="absolute bottom-8 left-6 w-24 h-24 rounded-full opacity-[0.06]"
               animate={{ y: [0, 10, 0], x: [0, 6, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
               style={{ background: schemeColors[1] }} />
-            <motion.h3 initial={{ opacity: 0, y: 40, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-              className={`mb-4 text-3xl font-extrabold sm:text-5xl leading-tight ${txtClass(s.layout)}`}>{s.title}</motion.h3>
-            {s.bullets[0] && <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.3 }}
-              className={`text-lg ${subtxtClass(s.layout)}`}>{s.bullets[0]}</motion.p>}
+            <motion.div className="absolute top-1/3 left-1/4 w-16 h-16 rounded-full opacity-[0.05]"
+              animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[0] }} />
+            {/* Thin accent line above title */}
+            <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ type: 'spring', stiffness: 100, damping: 15, delay: 0.1 }}
+              className="mb-6 h-1 w-16 rounded-full" style={{ background: `${schemeColors[2]}80` }} />
+            <motion.h3 initial={{ opacity: 0, y: 40, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.15 }}
+              className={`mb-4 text-4xl font-extrabold sm:text-5xl leading-tight tracking-tight ${txtClass(s.layout)}`}>{s.title}</motion.h3>
+            {s.bullets[0] && <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.35 }}
+              className={`text-lg max-w-lg leading-relaxed ${subtxtClass(s.layout)}`}>{s.bullets[0]}</motion.p>}
           </div>
         );
       case 'big_statement':
@@ -631,13 +647,14 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
         return (
           <div className="flex h-full flex-col justify-center">
             <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-              className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+              className="mb-8 text-2xl font-extrabold text-text-primary text-center">{s.title}</motion.h3>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {(s.iconItems || []).map((item, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 40, scale: 0.85 }} animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
-                  className="rounded-xl border border-border/50 bg-bg-secondary/80 backdrop-blur-sm p-4 text-center hover:border-accent/30 hover:shadow-lg transition-all">
-                  <span className="text-2xl mb-2 block">{item.icon}</span>
+                  className="rounded-2xl border border-border/40 bg-bg-secondary/60 backdrop-blur-sm p-5 text-center hover:border-accent/30 hover:shadow-xl transition-all group"
+                  style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+                  <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform">{item.icon}</span>
                   <p className="text-sm font-bold text-text-primary mb-1">{item.title}</p>
                   <p className="text-xs text-text-muted leading-relaxed">{item.desc}</p>
                 </motion.div>
@@ -687,48 +704,54 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
       case 'split_image':
         return (
           <div className="flex h-full flex-col justify-center">
-            <div className="grid grid-cols-2 gap-0 rounded-xl overflow-hidden h-full">
+            <div className="grid grid-cols-2 gap-0 rounded-2xl overflow-hidden h-full shadow-xl">
               <motion.div initial={{ opacity: 0, x: -60 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                className="flex flex-col justify-center p-8" style={{ background: schemeColors[0] }}>
-                <h3 className="text-2xl font-bold text-white mb-4">{s.title}</h3>
-                <ul className="space-y-2">
+                className="flex flex-col justify-center px-10 py-8" style={{ background: schemeColors[0] }}>
+                <h3 className="text-2xl font-extrabold text-white mb-5 leading-tight">{s.title}</h3>
+                <ul className="space-y-3">
                   {s.bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-white/80">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />{b}
-                    </li>
+                    <motion.li key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
+                      className="flex items-start gap-3 text-sm text-white/85 leading-relaxed">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-white/40" />{b}
+                    </motion.li>
                   ))}
                 </ul>
               </motion.div>
-              <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.2 }}>
+              <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.2 }}
+                className="relative overflow-hidden">
                 {s.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full flex items-center justify-center bg-bg-secondary">
-                    <p className="text-sm italic text-text-muted text-center px-4">{s.imageDescription || 'Image'}</p>
+                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                ) : null}
+                <div className={`${s.imageUrl ? 'hidden' : ''} h-full flex flex-col items-center justify-center p-6`}
+                  style={{ background: `linear-gradient(135deg, ${schemeColors[1]}30, ${schemeColors[2]}20)` }}>
+                  <div className="rounded-xl bg-white/10 backdrop-blur-sm p-5 text-center border border-white/10">
+                    <p className="text-sm text-text-secondary italic leading-relaxed">{s.imageDescription || 'Image'}</p>
                   </div>
-                )}
+                </div>
               </motion.div>
             </div>
           </div>
         );
       case 'full_image':
         return (
-          <div className="relative flex h-full items-end justify-start overflow-hidden rounded-xl">
+          <div className="relative flex h-full items-end justify-start overflow-hidden rounded-2xl">
             {s.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.imageUrl} alt={s.imageDescription || ''} className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 bg-bg-secondary" />
-            )}
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 40%, transparent 100%)' }} />
+              <img src={s.imageUrl} alt={s.imageDescription || ''} className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            ) : null}
+            <div className="absolute inset-0" style={{ background: s.imageUrl
+              ? 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 40%, transparent 100%)'
+              : `linear-gradient(135deg, ${schemeColors[0]}, ${schemeColors[1]})` }} />
             <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.2 }}
-              className="relative z-10 p-8">
-              {/* Luis Urrutia technique: semi-transparent frosted shape behind text */}
-              <div className="inline-block rounded-xl bg-black/30 backdrop-blur-md px-6 py-4 border border-white/10">
-                <h3 className="text-3xl font-extrabold text-white mb-2">{s.title}</h3>
+              className="relative z-10 p-10">
+              <div className="inline-block rounded-2xl bg-black/30 backdrop-blur-md px-8 py-5 border border-white/10 shadow-2xl">
+                <h3 className="text-3xl font-extrabold text-white mb-2 leading-tight">{s.title}</h3>
                 {(s.overlayText || s.bullets[0]) && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-                  className="text-base text-white/80">{s.overlayText || s.bullets[0]}</motion.p>}
+                  className="text-base text-white/80 leading-relaxed">{s.overlayText || s.bullets[0]}</motion.p>}
               </div>
             </motion.div>
           </div>
@@ -835,26 +858,26 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
         return (
           <div className="flex h-full flex-col justify-center">
             <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-              className="mb-6 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+              className="mb-8 text-2xl font-extrabold text-text-primary text-center">{s.title}</motion.h3>
             <div className="grid grid-cols-2 gap-6">
               <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.15 }}
-                className="rounded-2xl bg-bg-secondary/80 backdrop-blur-sm p-6 shadow-lg border-t-4" style={{ borderTopColor: schemeColors[0] }}>
-                <h4 className="mb-4 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[0] }}>{s.leftLabel || 'Option A'}</h4>
+                className="rounded-2xl bg-bg-secondary/60 backdrop-blur-sm p-7 shadow-xl border-t-4" style={{ borderTopColor: schemeColors[0] }}>
+                <h4 className="mb-5 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[0] }}>{s.leftLabel || 'Option A'}</h4>
                 <ul className="space-y-3">{(s.leftColumn || []).map((item, i) => (
                   <motion.li key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 + i * 0.08 }}
-                    className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[0] }} />{item}</motion.li>
+                    className="flex items-start gap-3 text-sm text-text-secondary leading-relaxed"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[0] }} />{item}</motion.li>
                 ))}</ul>
               </motion.div>
               <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.25 }}
-                className="rounded-2xl bg-bg-secondary/80 backdrop-blur-sm p-6 shadow-lg border-t-4" style={{ borderTopColor: schemeColors[1] }}>
-                <h4 className="mb-4 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[1] }}>{s.rightLabel || 'Option B'}</h4>
+                className="rounded-2xl bg-bg-secondary/60 backdrop-blur-sm p-7 shadow-xl border-t-4" style={{ borderTopColor: schemeColors[1] }}>
+                <h4 className="mb-5 text-sm font-bold uppercase tracking-wider" style={{ color: schemeColors[1] }}>{s.rightLabel || 'Option B'}</h4>
                 <ul className="space-y-3">{(s.rightColumn || []).map((item, i) => (
                   <motion.li key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 + i * 0.08 }}
-                    className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[1] }} />{item}</motion.li>
+                    className="flex items-start gap-3 text-sm text-text-secondary leading-relaxed"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: schemeColors[1] }} />{item}</motion.li>
                 ))}</ul>
               </motion.div>
             </div>
@@ -863,22 +886,23 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
       case 'image_text':
         return (
           <div className="flex h-full flex-col justify-center">
-            <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
-            <div className="grid grid-cols-2 gap-6">
-              {s.imageUrl ? (
-                <div className="overflow-hidden rounded-xl">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover rounded-xl" />
+            <h3 className="mb-6 text-2xl font-extrabold text-text-primary">{s.title}</h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="overflow-hidden rounded-2xl shadow-lg">
+                {s.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                ) : null}
+                <div className={`${s.imageUrl ? 'hidden' : ''} h-full flex items-center justify-center p-6`}
+                  style={{ background: `linear-gradient(135deg, ${schemeColors[0]}20, ${schemeColors[1]}15)` }}>
+                  <p className="text-sm italic text-text-muted text-center leading-relaxed">{s.imageDescription || 'Image'}</p>
                 </div>
-              ) : (
-                <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-bg-secondary p-6">
-                  <p className="text-sm italic text-text-muted text-center">{s.imageDescription || 'Image'}</p>
-                </div>
-              )}
-              <ul className="space-y-3">{s.bullets.map((b, i) => (
+              </div>
+              <ul className="space-y-3 flex flex-col justify-center">{s.bullets.map((b, i) => (
                 <motion.li key={i} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.1 }}
-                  className="flex items-start gap-3 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</motion.li>
+                  className="flex items-start gap-3 text-sm text-text-secondary leading-relaxed"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</motion.li>
               ))}</ul>
             </div>
           </div>
@@ -963,16 +987,17 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                 ))}
               </ul>
               {s.imageDescription && (
-                s.imageUrl ? (
-                  <div className="overflow-hidden rounded-xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.imageUrl} alt={s.imageDescription} className="h-full w-full object-cover rounded-xl" />
+                <div className="overflow-hidden rounded-2xl shadow-md">
+                  {s.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.imageUrl} alt={s.imageDescription} className="h-full w-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                  ) : null}
+                  <div className={`${s.imageUrl ? 'hidden' : ''} h-full flex items-center justify-center p-5`}
+                    style={{ background: `linear-gradient(135deg, ${schemeColors[0]}15, ${schemeColors[1]}10)` }}>
+                    <p className="text-xs italic text-text-muted text-center leading-relaxed">{s.imageDescription}</p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-bg-secondary p-4">
-                    <p className="text-xs italic text-text-muted text-center">{s.imageDescription}</p>
-                  </div>
-                )
+                </div>
               )}
             </div>
           </div>
@@ -1138,6 +1163,30 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                 <PillSelect options={TRANSITIONS.map(t => t.label)} value={TRANSITIONS.find(t => t.value === transition)?.label || 'Morph'} onChange={(v) => setTransition(TRANSITIONS.find(t => t.label === v)?.value || 'morph')} />
               </div>
 
+              {/* Style & Humanize Toggles */}
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setMatchMyStyle(!matchMyStyle)}
+                  className={`flex items-center gap-2.5 rounded-xl px-4 py-3 text-left transition-all ${matchMyStyle ? 'bg-accent/10 border-2 border-accent/40' : 'border border-border hover:bg-bg-hover'}`}>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${matchMyStyle ? 'bg-accent' : 'border border-border'}`}>
+                    {matchMyStyle && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-text-primary">Match My Style</p>
+                    <p className="text-[10px] text-text-muted">Adapts to your writing voice</p>
+                  </div>
+                </button>
+                <button onClick={() => setHumanize(!humanize)}
+                  className={`flex items-center gap-2.5 rounded-xl px-4 py-3 text-left transition-all ${humanize ? 'bg-success/10 border-2 border-success/40' : 'border border-border hover:bg-bg-hover'}`}>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${humanize ? 'bg-success' : 'border border-border'}`}>
+                    {humanize && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-text-primary">Humanize</p>
+                    <p className="text-[10px] text-text-muted">Less AI, more natural</p>
+                  </div>
+                </button>
+              </div>
+
               {/* Advanced Options Toggle */}
               <button onClick={() => setShowAdvanced(!showAdvanced)}
                 className="flex w-full items-center justify-between rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors">
@@ -1244,9 +1293,11 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                     animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
                     exit={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.out || {}) }}
                     transition={TRANSITION_TIMING[transition] || { duration: 0.5 }}
-                    className={`absolute inset-0 rounded-xl ${isGradientSlide(slide?.layout || 'content') ? '' : 'border border-border/50'} p-8 sm:p-12 overflow-hidden`}
+                    className={`absolute inset-0 rounded-2xl ${isGradientSlide(slide?.layout || 'content') ? '' : 'border border-border/50'} p-8 sm:p-12 overflow-hidden`}
                     style={{
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+                      boxShadow: isGradientSlide(slide?.layout || 'content')
+                        ? `0 12px 40px ${schemeColors[0]}30, 0 4px 12px rgba(0,0,0,0.15)`
+                        : '0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
                       background: getSlideBackground(slide?.layout || 'content', schemeColors) || 'var(--bg-card)',
                     }}
                   >
