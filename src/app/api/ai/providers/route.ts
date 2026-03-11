@@ -7,12 +7,15 @@ export async function POST(req: NextRequest) {
 
     switch (type) {
       case 'free': {
-        const freeKey = process.env.FREE_GEMINI_API_KEY;
+        // Support both comma-separated keys and legacy single key
+        const multi = process.env.FREE_GEMINI_API_KEYS;
+        const single = process.env.FREE_GEMINI_API_KEY;
+        const freeKey = multi ? multi.split(',')[0]?.trim() : single;
         if (!freeKey) {
-          return NextResponse.json({ connected: false, error: 'Free AI not configured on this server. The site owner needs to add FREE_GEMINI_API_KEY.' });
+          return NextResponse.json({ connected: false, error: 'Free AI not configured on this server. The site owner needs to add FREE_GEMINI_API_KEYS.' });
         }
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${freeKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${freeKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
         if (!res.ok) {
           return NextResponse.json({ connected: false, error: 'Free AI key is invalid or expired' });
         }
-        return NextResponse.json({ connected: true, model: 'gemini-2.0-flash' });
+        return NextResponse.json({ connected: true, model: 'gemini-2.5-flash-preview-05-20' });
       }
 
       case 'anthropic': {

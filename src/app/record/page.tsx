@@ -18,6 +18,17 @@ interface LectureAnalysis {
   studyNotes: string;
 }
 
+const VOICE_FILTER_PROMPT = `You are a transcript editor. The user has a classroom recording transcript that contains both the teacher/lecturer speaking AND student questions, chatter, and filler words.
+
+Your job:
+- Keep ONLY the teacher/lecturer's content
+- Remove all student questions, comments, and chatter
+- Remove filler words (um, uh, like, you know, etc.)
+- Keep the teacher's answers to student questions, but remove the student questions themselves
+- Clean up grammar and formatting for readability
+- Return clean, well-paragraphed text (NOT JSON, just plain text)
+- Preserve the original meaning and order of the lecture content`;
+
 const LECTURE_PROMPT = `You are an expert tutor. The student has provided lesson content below (from a recording and/or uploaded materials). Analyze it thoroughly.
 
 Return ONLY valid JSON (no code blocks):
@@ -47,6 +58,7 @@ export default function RecordPage() {
   const [showAnswers, setShowAnswers] = useState<Record<number, boolean>>({});
   const [recordTime, setRecordTime] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -165,6 +177,32 @@ export default function RecordPage() {
 
   const removeFile = (idx: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const filterTranscript = async () => {
+    if (!transcript.trim()) { toast.error('No transcript to filter'); return; }
+    const config = activeProvider ? providers[activeProvider] : null;
+    if (!config) { toast.error('No AI provider configured'); return; }
+
+    setFiltering(true);
+    try {
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'custom', essayText: transcript, systemPrompt: VOICE_FILTER_PROMPT, providerConfig: config }),
+      });
+      const data = await res.json();
+      const cleaned = data.raw || data.analysis?.toString() || '';
+      if (cleaned) {
+        setTranscript(cleaned);
+        toast.success('Student voices filtered out!');
+      } else {
+        toast.error('Filter returned empty result');
+      }
+    } catch {
+      toast.error('Voice filtering failed');
+    }
+    setFiltering(false);
   };
 
   const hasContent = transcript.trim() || uploadedFiles.length > 0;
@@ -302,7 +340,18 @@ export default function RecordPage() {
             rows={8}
             className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring resize-none"
           />
-          {transcript && <p className="mt-1 text-xs text-text-muted">{transcript.split(/\s+/).filter(Boolean).length} words</p>}
+          {transcript && (
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-text-muted">{transcript.split(/\s+/).filter(Boolean).length} words</p>
+              <button
+                onClick={filterTranscript}
+                disabled={filtering}
+                className="rounded-full bg-accent/10 text-accent border border-accent/20 px-4 py-1.5 text-xs font-medium hover:bg-accent/20 disabled:opacity-40 transition-colors"
+              >
+                {filtering ? 'Filtering...' : 'Filter Student Voices'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

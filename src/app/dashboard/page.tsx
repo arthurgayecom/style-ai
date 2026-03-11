@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useStyleProfile } from '@/hooks/useStyleProfile';
 import { useEssays } from '@/hooks/useEssays';
 import { useAIProvider } from '@/hooks/useAIProvider';
-import { getItem } from '@/lib/storage/localStorage';
+import { getItem, setItem } from '@/lib/storage/localStorage';
 import { getConfidenceColor, getRecommendation } from '@/lib/analysis/confidence';
 import { getDayStreak, getWeeklyActivity, recordActivity } from '@/lib/streak';
 import { PROVIDERS } from '@/types/ai';
@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [learningStats, setLearningStats] = useState({ essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 });
   const [dayStreak, setDayStreak] = useState(0);
   const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [snapBannerDismissed, setSnapBannerDismissed] = useState(true);
 
   useEffect(() => {
     recordActivity();
@@ -74,6 +75,7 @@ export default function DashboardPage() {
     setLearningStats(getItem('learning_stats', { essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 }));
     setDayStreak(getDayStreak());
     setWeeklyActivity(getWeeklyActivity());
+    setSnapBannerDismissed(getItem<boolean>('snap_banner_dismissed', false));
   }, []);
 
   const analyzedCount = essays.filter((e) => e.status === 'analyzed').length;
@@ -94,6 +96,40 @@ export default function DashboardPage() {
           {hasProfile && ` | ${confidence}% style confidence`}
         </p>
       </div>
+
+      {/* Snapchat Banner */}
+      {!snapBannerDismissed && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 relative rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 via-yellow-500/10 to-yellow-500/5 p-4"
+        >
+          <button
+            onClick={() => { setSnapBannerDismissed(true); setItem('snap_banner_dismissed', true); }}
+            className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-yellow-500/20 text-xl">
+              👻
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-text-primary leading-relaxed">
+                Help us keep CDL Study free! If you have any Google accounts you can donate for more free credits, or ideas for the app, add me on Snapchat
+              </p>
+            </div>
+            <a
+              href="https://www.snapchat.com/add/arthurgaye24"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-full bg-yellow-500 px-4 py-2 text-sm font-bold text-black hover:bg-yellow-400 transition-colors"
+            >
+              @arthurgaye24
+            </a>
+          </div>
+        </motion.div>
+      )}
 
       {/* How It Works — clear 3-step workflow */}
       <div className="mb-8">

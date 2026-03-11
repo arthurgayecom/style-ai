@@ -9,9 +9,11 @@ export function createProvider(config: ProviderConfig): AIProvider {
     case 'free': {
       // Free provider uses server-side Gemini key from env
       const { createGeminiProvider } = require('./gemini');
-      const freeKey = process.env.FREE_GEMINI_API_KEY;
-      if (!freeKey) throw new Error('Free AI not configured. Ask the site owner to add FREE_GEMINI_API_KEY.');
-      return createGeminiProvider(freeKey, 'gemini-2.0-flash');
+      const multi = process.env.FREE_GEMINI_API_KEYS;
+      const single = process.env.FREE_GEMINI_API_KEY;
+      const freeKey = multi ? multi.split(',')[0]?.trim() : single;
+      if (!freeKey) throw new Error('Free AI not configured. Ask the site owner to add FREE_GEMINI_API_KEYS.');
+      return createGeminiProvider(freeKey, 'gemini-2.5-flash-preview-05-20');
     }
     case 'anthropic': {
       const { createAnthropicProvider } = require('./anthropic');

@@ -56,9 +56,9 @@ export function AIProviderProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({ type: 'free' }),
       }).then(r => r.json()).then(data => {
         if (data.connected) {
-          setProviders(prev => ({ ...prev, free: { type: 'free', enabled: true, model: 'gemini-2.0-flash' } }));
+          setProviders(prev => ({ ...prev, free: { type: 'free', enabled: true, model: 'gemini-2.5-flash-preview-05-20' } }));
           setActiveProviderState('free');
-          setItem('providers', { ...merged, free: { type: 'free', enabled: true, model: 'gemini-2.0-flash' } });
+          setItem('providers', { ...merged, free: { type: 'free', enabled: true, model: 'gemini-2.5-flash-preview-05-20' } });
           setItem('active_provider', 'free');
         }
       }).catch(() => { /* silent */ });

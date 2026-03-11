@@ -7,9 +7,11 @@ import { useStyleProfile } from '@/hooks/useStyleProfile';
 import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { getItem, setItem } from '@/lib/storage/localStorage';
+import { exportAsPPTX } from '@/lib/export/pptxExport';
 import { toast } from 'sonner';
 
-type SlideLayout = 'title' | 'content' | 'image_text' | 'comparison' | 'quote' | 'section' | 'timeline' | 'stats' | 'steps';
+type SlideLayout = 'title' | 'content' | 'image_text' | 'comparison' | 'quote' | 'section' | 'timeline' | 'stats' | 'steps'
+  | 'big_statement' | 'icon_grid' | 'split_image' | 'numbered_list' | 'full_image' | 'two_column_text' | 'highlight_box' | 'process_flow' | 'feature_cards' | 'closing' | 'agenda' | 'bento_grid';
 
 interface Slide {
   layout: SlideLayout;
@@ -27,6 +29,16 @@ interface Slide {
   steps?: { label: string; description: string }[];
   stats?: { value: string; label: string }[];
   timelineItems?: { date: string; event: string }[];
+  statement?: string;
+  iconItems?: { icon: string; title: string; desc: string }[];
+  numberedItems?: { number: string; title: string; desc: string }[];
+  processSteps?: { label: string; desc: string }[];
+  featureCards?: { icon: string; title: string; desc: string }[];
+  highlightValue?: string;
+  highlightLabel?: string;
+  agendaItems?: { title: string; desc: string }[];
+  overlayText?: string;
+  bentoItems?: { icon: string; title: string; desc: string; span?: 'wide' | 'tall' | 'normal' }[];
 }
 
 interface Presentation {
@@ -113,10 +125,13 @@ const CONTENT_DENSITY = [
 ];
 
 const TRANSITIONS = [
-  { value: 'none', label: 'None' },
+  { value: 'morph', label: 'Morph' },
   { value: 'fade', label: 'Fade' },
   { value: 'slide', label: 'Slide' },
   { value: 'zoom', label: 'Zoom' },
+  { value: 'push', label: 'Push' },
+  { value: 'cinematic', label: 'Cinematic' },
+  { value: 'none', label: 'None' },
 ];
 
 /* ── Prompt Builder ── */
@@ -141,7 +156,7 @@ function buildPrompt(opts: {
   if (opts.includeTakeaways) specialSlides += '\n- Include a Key Takeaways slide near the end';
   if (opts.includeReferences) specialSlides += '\n- Include a Sources / References slide at the very end';
 
-  return `You are an expert presentation designer like Gamma AI. Create a ${opts.format} presentation.
+  return `You are an elite presentation designer. Design like a modern TikTok presentation creator — one idea per slide, bold punchy text, minimal words, high visual contrast. Create a ${opts.format} presentation.
 
 LANGUAGE: ${opts.language}
 VISUAL STYLE: ${opts.style}
@@ -159,33 +174,107 @@ ${opts.customInstructions ? `\nCUSTOM INSTRUCTIONS:\n${opts.customInstructions}`
 WRITING STYLE:
 ${opts.styleSection}
 
-Use VARIED slide layouts for visual interest. Available layouts:
-- title: Large title + optional subtitle in bullets[0]
+AVAILABLE LAYOUTS (21 total — you MUST use at least 8 different layout types, NEVER use the same layout 3 times in a row):
+
+IMPACT LAYOUTS (bold, gradient backgrounds, one idea per slide):
+- title: Opening slide. title + optional subtitle in bullets[0]
+- big_statement: Full gradient bg, single powerful statement. Fields: statement (the big text), title (small label above)
+- section: Section divider with just a title
+- closing: Final slide with CTA or "Thank You". Fields: statement (main text), title (small label)
+- highlight_box: Large accent-colored box with key stat/fact. Fields: highlightValue (big number/fact), highlightLabel (description), bullets (supporting points)
+- full_image: Cinematic full-bleed image with text overlay. Fields: imageDescription, overlayText (text on image), title
+
+CONTENT LAYOUTS (clean bg, readable, detail-oriented):
 - content: Title + bullet points + optional imageDescription
-- image_text: Split layout — imageDescription on one side, bullets on other
-- comparison: Two columns with leftLabel, leftColumn, rightLabel, rightColumn
-- quote: A notable quote with quoteAuthor
-- section: Section break with just a title
-- timeline: Chronological events with timelineItems: [{date, event}]
-- stats: Key statistics with stats: [{value, label}] (3-4 items)
-- steps: Process/steps with steps: [{label, description}]
+- image_text: Split — imageDescription on one side, bullets on other
+- comparison: Two columns. Fields: leftLabel, leftColumn[], rightLabel, rightColumn[]
+- two_column_text: Two text columns with distinct headers. Fields: leftLabel, leftColumn[], rightLabel, rightColumn[]
+- quote: Notable quote. Fields: quote, quoteAuthor
+
+DATA & STRUCTURE LAYOUTS:
+- stats: Key statistics. Fields: stats: [{value, label}] (3-4 items)
+- timeline: Chronological events. Fields: timelineItems: [{date, event}]
+- steps: Process/how-to. Fields: steps: [{label, description}]
+- numbered_list: Numbered items with descriptions. Fields: numberedItems: [{number, title, desc}]
+- process_flow: Horizontal flow of connected steps. Fields: processSteps: [{label, desc}] (3-5 steps)
+- agenda: Numbered agenda items. Fields: agendaItems: [{title, desc}]
+
+VISUAL GRID LAYOUTS:
+- icon_grid: 2×3 or 3×2 grid of mini-cards with emoji. Fields: iconItems: [{icon (emoji), title, desc}] (4-6 items)
+- feature_cards: 3-4 horizontal feature cards. Fields: featureCards: [{icon (emoji), title, desc}]
+- split_image: Left text + right image. Fields: bullets (left text), imageDescription (right image), title
+- bento_grid: Modular bento-box layout (2026 trend). Fields: bentoItems: [{icon (emoji), title, desc, span ("wide"/"tall"/"normal")}] (4-6 items, mix spans for visual interest)
+
+DESIGN RULES:
+1. ALWAYS start with "title". ALWAYS end with "closing".
+2. Alternate between impact slides (big_statement, highlight_box, full_image) and content slides (content, icon_grid, feature_cards, numbered_list). This creates visual rhythm.
+3. Use "big_statement" for powerful one-liners. Use "icon_grid" and "feature_cards" instead of long bullet lists. Use "split_image" when visuals matter.
+4. After a dense content slide, follow with a spacious impact slide. Group related content in 2-3 slide sequences before transitioning with a "section" slide.
+5. Use "highlight_box" for the single most important stat or fact.
 
 Return ONLY valid JSON (no code blocks):
 {
   "title": "presentation title",
   "slides": [
     {"layout": "title", "title": "...", "bullets": ["subtitle"], "notes": "..."},
+    {"layout": "big_statement", "title": "Key Insight", "statement": "One powerful line here", "bullets": [], "notes": "..."},
+    {"layout": "icon_grid", "title": "...", "bullets": [], "notes": "...", "iconItems": [{"icon": "🚀", "title": "...", "desc": "..."}]},
     {"layout": "content", "title": "...", "bullets": ["..."], "notes": "...", "imageDescription": "..."},
-    {"layout": "comparison", "title": "...", "bullets": [], "notes": "...", "leftLabel": "...", "leftColumn": ["..."], "rightLabel": "...", "rightColumn": ["..."]},
-    {"layout": "quote", "title": "...", "bullets": [], "notes": "...", "quote": "...", "quoteAuthor": "..."},
-    {"layout": "timeline", "title": "...", "bullets": [], "notes": "...", "timelineItems": [{"date": "...", "event": "..."}]},
-    {"layout": "stats", "title": "...", "bullets": [], "notes": "...", "stats": [{"value": "85%", "label": "..."}]},
-    {"layout": "steps", "title": "...", "bullets": [], "notes": "...", "steps": [{"label": "Step 1", "description": "..."}]}
+    {"layout": "feature_cards", "title": "...", "bullets": [], "notes": "...", "featureCards": [{"icon": "⚡", "title": "...", "desc": "..."}]},
+    {"layout": "highlight_box", "title": "...", "bullets": ["supporting point"], "notes": "...", "highlightValue": "85%", "highlightLabel": "..."},
+    {"layout": "numbered_list", "title": "...", "bullets": [], "notes": "...", "numberedItems": [{"number": "01", "title": "...", "desc": "..."}]},
+    {"layout": "process_flow", "title": "...", "bullets": [], "notes": "...", "processSteps": [{"label": "Step 1", "desc": "..."}]},
+    {"layout": "closing", "title": "Next Steps", "statement": "Let's make it happen", "bullets": [], "notes": "..."}
   ]
 }
 
-Make it engaging, NOT generic AI text. Every slide should have speaker notes. Vary layouts — do NOT repeat the same layout more than twice in a row.`;
+Make it engaging, NOT generic AI text. Every slide MUST have speaker notes. Use bold, punchy language. One idea per slide.`;
 }
+
+/* ── Gradient & Transition Helpers ── */
+
+const GRADIENT_LAYOUTS = new Set(['big_statement', 'section', 'closing', 'title', 'highlight_box']);
+
+function getSlideBackground(layout: string, colors: string[]): string | undefined {
+  if (!GRADIENT_LAYOUTS.has(layout)) return undefined;
+  // jacobppt/lourrutia.ppt: dark-blended gradients, 2-3 color smooth blends, subtle mid-stop transparency
+  if (layout === 'big_statement' || layout === 'closing') {
+    return `linear-gradient(135deg, ${colors[0]}, ${colors[1]}, ${colors[0]}bb)`;
+  }
+  if (layout === 'highlight_box') {
+    return `linear-gradient(160deg, ${colors[0]}ee, ${colors[1]})`;
+  }
+  if (layout === 'title') {
+    return `linear-gradient(145deg, ${colors[0]}, ${colors[1]}dd, ${colors[0]}99)`;
+  }
+  return `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`;
+}
+
+function isGradientSlide(layout: string): boolean {
+  return GRADIENT_LAYOUTS.has(layout);
+}
+
+// jacobppt/lourrutia.ppt: morph = smooth scale+fade, push = slides push each other, cinematic = dramatic zoom+rotate
+const TRANSITION_VARIANTS: Record<string, { in: Record<string, number>; out: Record<string, number> }> = {
+  morph:     { in: { opacity: 0, scale: 0.88, y: 40 },   out: { opacity: 0, scale: 1.12, y: -40 } },
+  fade:      { in: { opacity: 0 },                        out: { opacity: 0 } },
+  slide:     { in: { opacity: 0, x: 120 },                out: { opacity: 0, x: -120 } },
+  zoom:      { in: { opacity: 0, scale: 0.6 },            out: { opacity: 0, scale: 1.4 } },
+  push:      { in: { opacity: 0, x: 300 },                out: { opacity: 0, x: -300 } },
+  cinematic: { in: { opacity: 0, scale: 0.7, rotate: -2 }, out: { opacity: 0, scale: 1.3, rotate: 2 } },
+  none:      { in: {},                                     out: {} },
+};
+
+// Per-transition timing: morph is smooth spring, push is snappy, cinematic is dramatic slow
+const TRANSITION_TIMING: Record<string, object> = {
+  morph:     { type: 'spring', stiffness: 120, damping: 20, mass: 1 },
+  fade:      { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
+  slide:     { type: 'spring', stiffness: 180, damping: 26 },
+  zoom:      { type: 'spring', stiffness: 100, damping: 18 },
+  push:      { type: 'spring', stiffness: 250, damping: 30 },
+  cinematic: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  none:      { duration: 0 },
+};
 
 /* ── Component ── */
 
@@ -207,7 +296,7 @@ export default function PresentPage() {
   // Advanced
   const [colorScheme, setColorScheme] = useState('auto');
   const [contentDensity, setContentDensity] = useState('standard');
-  const [transition, setTransition] = useState('fade');
+  const [transition, setTransition] = useState('morph');
   const [includeTOC, setIncludeTOC] = useState(false);
   const [includeSummary, setIncludeSummary] = useState(true);
   const [includeTakeaways, setIncludeTakeaways] = useState(false);
@@ -287,12 +376,21 @@ export default function PresentPage() {
       if (imageSource === 'descriptions') {
         const slidesWithImages = parsed.slides.filter(s => s.imageDescription);
         const imagePromises = slidesWithImages.map(async (s) => {
-          const query = s.imageDescription!.split(' ').slice(0, 4).join(' ');
+          // Use more descriptive query — take key nouns
+          const desc = s.imageDescription!;
+          const query = desc.split(' ').slice(0, 5).join(' ');
           try {
+            // Try Unsplash source first
             const imgUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(query)}&sig=${Date.now() + Math.random()}`;
             s.imageUrl = imgUrl;
           } catch {
-            // Leave as description if image fetch fails
+            try {
+              // Fallback: try simpler query
+              const simpleQuery = desc.split(' ').slice(0, 2).join(' ');
+              s.imageUrl = `https://source.unsplash.com/800x600/?${encodeURIComponent(simpleQuery)}&sig=${Date.now()}`;
+            } catch {
+              // Leave as description if all image fetches fail
+            }
           }
         });
         await Promise.all(imagePromises);
@@ -319,6 +417,52 @@ export default function PresentPage() {
       toast.error(err instanceof Error ? err.message : 'Generation failed');
     }
     setLoading(false);
+  };
+
+  const loadDemo = () => {
+    const demo: Presentation = {
+      title: 'CDL Study Tool — Your AI Study Partner',
+      slides: [
+        {
+          layout: 'title',
+          title: 'CDL Study Tool',
+          bullets: ['The AI-powered study platform that learns how YOU write'],
+          notes: 'Welcome slide — introduce CDL Study Tool as a personalized AI study companion.',
+        },
+        {
+          layout: 'bento_grid',
+          title: 'Everything You Need to Study',
+          bullets: [],
+          notes: 'Showcase the key features in a modern bento grid layout.',
+          bentoItems: [
+            { icon: '🎙', title: 'Record Lectures', desc: 'Record or upload — AI summarizes everything', span: 'wide' },
+            { icon: '📝', title: 'Smart Exercises', desc: 'Practice questions from your lessons', span: 'normal' },
+            { icon: '🎬', title: 'Brainrot Video', desc: 'TikTok-style study podcasts', span: 'normal' },
+            { icon: '🎨', title: 'Pro Presentations', desc: '21 layouts, 10 color schemes, PPTX export', span: 'normal' },
+            { icon: '✍️', title: 'Essay Writer', desc: 'Generates in YOUR writing style', span: 'normal' },
+          ],
+        },
+        {
+          layout: 'highlight_box',
+          title: 'Powered by Free AI',
+          bullets: ['No API key needed', 'Works out of the box', '7 providers supported'],
+          notes: 'Emphasize that CDL Study is free to use with the built-in AI.',
+          highlightValue: '100% Free',
+          highlightLabel: 'Built-in AI — no setup required',
+        },
+        {
+          layout: 'closing',
+          title: 'Get Started',
+          statement: 'Start studying smarter today',
+          bullets: ['Visit CDL Study Tool — free for everyone'],
+          notes: 'Call to action — encourage users to try the tool.',
+        },
+      ],
+    };
+    setPresentation(demo);
+    setCurrentSlide(0);
+    setViewMode('slide');
+    toast.success('Demo presentation loaded!');
   };
 
   const goToSlide = (idx: number) => {
@@ -383,27 +527,294 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
     toast.success('Downloaded as HTML slideshow');
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  const exportPPTX = async () => {
+    if (!presentation) return;
+    setExporting(true);
+    try {
+      const colors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+      await exportAsPPTX({ presentation, colors });
+      toast.success('Downloaded as PowerPoint!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'PPTX export failed');
+    }
+    setExporting(false);
+  };
+
   const slide = presentation?.slides[currentSlide];
 
   /* ── Slide Renderer ── */
+
+  const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+  const gradientBg = isGradientSlide;
+  const txtClass = (layout: string) => gradientBg(layout) ? 'text-white' : 'text-text-primary';
+  const subtxtClass = (layout: string) => gradientBg(layout) ? 'text-white/70' : 'text-text-secondary';
 
   const renderSlide = (s: Slide) => {
     switch (s.layout) {
       case 'title':
         return (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <h3 className="mb-4 text-3xl font-bold text-text-primary sm:text-4xl">{s.title}</h3>
-            {s.bullets[0] && <p className="text-lg text-text-secondary">{s.bullets[0]}</p>}
-            {s.imageDescription && (
-              s.imageUrl ? (
-                <div className="mt-6 overflow-hidden rounded-lg max-w-sm mx-auto">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.imageUrl} alt={s.imageDescription} className="w-full object-cover rounded-lg" />
-                </div>
-              ) : (
-                <p className="mt-6 text-sm italic text-text-muted">[{s.imageDescription}]</p>
-              )
+          <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden">
+            <motion.div className="absolute top-6 right-8 w-32 h-32 rounded-full opacity-10"
+              animate={{ y: [0, -12, 0], scale: [1, 1.05, 1] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[2] }} />
+            <motion.div className="absolute bottom-8 left-6 w-20 h-20 rounded-full opacity-10"
+              animate={{ y: [0, 10, 0], x: [0, 6, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[1] }} />
+            <motion.h3 initial={{ opacity: 0, y: 40, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className={`mb-4 text-3xl font-extrabold sm:text-5xl leading-tight ${txtClass(s.layout)}`}>{s.title}</motion.h3>
+            {s.bullets[0] && <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.3 }}
+              className={`text-lg ${subtxtClass(s.layout)}`}>{s.bullets[0]}</motion.p>}
+          </div>
+        );
+      case 'big_statement':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden px-8">
+            <motion.div className="absolute bottom-10 right-10 w-40 h-40 rounded-full opacity-10"
+              animate={{ scale: [1, 1.15, 1], rotate: [0, 8, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[2] }} />
+            <motion.div className="absolute top-8 left-12 w-24 h-24 rounded-full opacity-[0.07]"
+              animate={{ y: [0, -15, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[1] }} />
+            {s.title && <motion.p initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 100, damping: 15 }}
+              className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-white/50">{s.title}</motion.p>}
+            <motion.p initial={{ opacity: 0, scale: 0.85, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.15 }}
+              className="text-3xl font-extrabold text-white sm:text-5xl leading-tight max-w-2xl">{s.statement || s.bullets[0] || s.title}</motion.p>
+          </div>
+        );
+      case 'closing':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden px-8">
+            <motion.div className="absolute top-8 left-10 w-24 h-24 rounded-full opacity-10"
+              animate={{ y: [0, -10, 0], scale: [1, 1.1, 1] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[2] }} />
+            <motion.div className="absolute bottom-6 right-8 w-36 h-36 rounded-full opacity-10"
+              animate={{ y: [0, 12, 0], x: [0, -8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[0] }} />
+            <motion.p initial={{ opacity: 0, y: 50, scale: 0.85 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 100, damping: 16 }}
+              className="text-4xl font-extrabold text-white sm:text-5xl mb-4">{s.statement || s.title}</motion.p>
+            {s.bullets[0] && <motion.p initial={{ opacity: 0, y: 25 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.35 }}
+              className="text-lg text-white/60">{s.bullets[0]}</motion.p>}
+          </div>
+        );
+      case 'highlight_box':
+        return (
+          <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden">
+            <motion.div className="absolute top-8 right-12 w-28 h-28 rounded-full opacity-[0.08]"
+              animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[2] }} />
+            <motion.h3 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className={`mb-6 text-lg font-semibold ${txtClass(s.layout)}`}>{s.title}</motion.h3>
+            <motion.div initial={{ opacity: 0, scale: 0.7, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 100, damping: 15, delay: 0.2 }}
+              className="rounded-2xl px-12 py-10 mb-6 backdrop-blur-md border border-white/10 shadow-2xl" style={{ background: `${schemeColors[0]}30` }}>
+              <p className="text-5xl font-extrabold text-white sm:text-6xl">{s.highlightValue || s.bullets[0]}</p>
+              <p className="mt-3 text-sm text-white/60 font-medium">{s.highlightLabel}</p>
+            </motion.div>
+            {s.bullets.length > 0 && (
+              <div className="space-y-1">
+                {s.bullets.slice(s.highlightValue ? 0 : 1).map((b, i) => (
+                  <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.08 }}
+                    className="text-sm text-white/50">{b}</motion.p>
+                ))}
+              </div>
             )}
+          </div>
+        );
+      case 'icon_grid':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {(s.iconItems || []).map((item, i) => (
+                <motion.div key={i} initial={{ opacity: 0, y: 40, scale: 0.85 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className="rounded-xl border border-border/50 bg-bg-secondary/80 backdrop-blur-sm p-4 text-center hover:border-accent/30 hover:shadow-lg transition-all">
+                  <span className="text-2xl mb-2 block">{item.icon}</span>
+                  <p className="text-sm font-bold text-text-primary mb-1">{item.title}</p>
+                  <p className="text-xs text-text-muted leading-relaxed">{item.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'feature_cards':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {(s.featureCards || []).map((card, i) => (
+                <motion.div key={i} initial={{ opacity: 0, y: 50, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.15 }}
+                  className="rounded-xl bg-bg-secondary/80 backdrop-blur-sm p-5 border-t-4 shadow-lg hover:shadow-xl transition-shadow" style={{ borderTopColor: schemeColors[i % schemeColors.length] }}>
+                  <span className="text-2xl mb-3 block">{card.icon}</span>
+                  <p className="text-sm font-bold text-text-primary mb-2">{card.title}</p>
+                  <p className="text-xs text-text-muted leading-relaxed">{card.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'bento_grid':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-6 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+            <div className="grid grid-cols-3 grid-rows-2 gap-3 auto-rows-fr" style={{ minHeight: '60%' }}>
+              {(s.bentoItems || []).map((item, i) => (
+                <motion.div key={i} initial={{ opacity: 0, scale: 0.75, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className={`rounded-xl p-4 flex flex-col justify-center ${
+                    item.span === 'wide' ? 'col-span-2' : item.span === 'tall' ? 'row-span-2' : ''
+                  }`}
+                  style={{ background: i === 0 ? schemeColors[0] : i === 1 ? `${schemeColors[1]}20` : i === 2 ? `${schemeColors[0]}15` : `${schemeColors[2]}15` }}>
+                  <span className="text-xl mb-1">{item.icon}</span>
+                  <p className={`text-sm font-bold mb-0.5 ${i === 0 ? 'text-white' : 'text-text-primary'}`}>{item.title}</p>
+                  <p className={`text-xs leading-relaxed ${i === 0 ? 'text-white/70' : 'text-text-muted'}`}>{item.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'split_image':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <div className="grid grid-cols-2 gap-0 rounded-xl overflow-hidden h-full">
+              <motion.div initial={{ opacity: 0, x: -60 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+                className="flex flex-col justify-center p-8" style={{ background: schemeColors[0] }}>
+                <h3 className="text-2xl font-bold text-white mb-4">{s.title}</h3>
+                <ul className="space-y-2">
+                  {s.bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />{b}
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+              <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.2 }}>
+                {s.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full flex items-center justify-center bg-bg-secondary">
+                    <p className="text-sm italic text-text-muted text-center px-4">{s.imageDescription || 'Image'}</p>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          </div>
+        );
+      case 'full_image':
+        return (
+          <div className="relative flex h-full items-end justify-start overflow-hidden rounded-xl">
+            {s.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={s.imageUrl} alt={s.imageDescription || ''} className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-bg-secondary" />
+            )}
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 40%, transparent 100%)' }} />
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 100, damping: 16, delay: 0.2 }}
+              className="relative z-10 p-8">
+              {/* Luis Urrutia technique: semi-transparent frosted shape behind text */}
+              <div className="inline-block rounded-xl bg-black/30 backdrop-blur-md px-6 py-4 border border-white/10">
+                <h3 className="text-3xl font-extrabold text-white mb-2">{s.title}</h3>
+                {(s.overlayText || s.bullets[0]) && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                  className="text-base text-white/80">{s.overlayText || s.bullets[0]}</motion.p>}
+              </div>
+            </motion.div>
+          </div>
+        );
+      case 'numbered_list':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary">{s.title}</motion.h3>
+            <div className="space-y-5">
+              {(s.numberedItems || []).map((item, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-extrabold text-white" style={{ background: schemeColors[0] }}>
+                    {item.number || String(i + 1).padStart(2, '0')}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">{item.title}</p>
+                    <p className="text-sm text-text-secondary mt-0.5">{item.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'two_column_text':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="mb-6 text-2xl font-bold text-text-primary">{s.title}</motion.h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide" style={{ color: schemeColors[0] }}>{s.leftLabel || 'Column A'}</h4>
+                <ul className="space-y-2">{(s.leftColumn || []).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: schemeColors[0] }} />{item}</li>
+                ))}</ul>
+              </div>
+              <div className="border-l border-border pl-8">
+                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide" style={{ color: schemeColors[1] }}>{s.rightLabel || 'Column B'}</h4>
+                <ul className="space-y-2">{(s.rightColumn || []).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: schemeColors[1] }} />{item}</li>
+                ))}</ul>
+              </div>
+            </div>
+          </div>
+        );
+      case 'process_flow':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</motion.h3>
+            <div className="flex items-start justify-center gap-2 flex-wrap">
+              {(s.processSteps || []).map((step, i) => (
+                <motion.div key={i} initial={{ opacity: 0, y: 30, scale: 0.85 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.15 }}
+                  className="flex items-center gap-2">
+                  <div className="flex flex-col items-center text-center w-28">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white mb-2" style={{ background: schemeColors[i % schemeColors.length] }}>
+                      {i + 1}
+                    </div>
+                    <p className="text-xs font-bold text-text-primary">{step.label}</p>
+                    <p className="text-[10px] text-text-muted mt-0.5 leading-tight">{step.desc}</p>
+                  </div>
+                  {i < (s.processSteps || []).length - 1 && (
+                    <svg className="h-4 w-4 text-text-muted shrink-0 mt-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'agenda':
+        return (
+          <div className="flex h-full flex-col justify-center">
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-8 text-2xl font-bold text-text-primary">{s.title}</motion.h3>
+            <div className="space-y-4 border-l-3 pl-6" style={{ borderLeftColor: `${schemeColors[0]}40` }}>
+              {(s.agendaItems || []).map((item, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className="flex items-start gap-4">
+                  <span className="text-2xl font-extrabold" style={{ color: schemeColors[0] }}>{String(i + 1).padStart(2, '0')}</span>
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">{item.title}</p>
+                    {item.desc && <p className="text-xs text-text-muted mt-0.5">{item.desc}</p>}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         );
       case 'quote':
@@ -419,14 +830,14 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
           <div className="flex h-full flex-col justify-center">
             <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
             <div className="grid grid-cols-2 gap-6">
-              <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent">{s.leftLabel || 'Option A'}</h4>
+              <div className="rounded-xl bg-bg-secondary p-5">
+                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-accent">{s.leftLabel || 'Option A'}</h4>
                 <ul className="space-y-2">{(s.leftColumn || []).map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{item}</li>
                 ))}</ul>
               </div>
-              <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent-secondary">{s.rightLabel || 'Option B'}</h4>
+              <div className="rounded-xl bg-bg-secondary p-5">
+                <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-accent-secondary">{s.rightLabel || 'Option B'}</h4>
                 <ul className="space-y-2">{(s.rightColumn || []).map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-text-secondary"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-secondary" />{item}</li>
                 ))}</ul>
@@ -440,39 +851,47 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
             <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
             <div className="grid grid-cols-2 gap-6">
               {s.imageUrl ? (
-                <div className="overflow-hidden rounded-lg">
+                <div className="overflow-hidden rounded-xl">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover rounded-lg" />
+                  <img src={s.imageUrl} alt={s.imageDescription || ''} className="h-full w-full object-cover rounded-xl" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-6">
+                <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-bg-secondary p-6">
                   <p className="text-sm italic text-text-muted text-center">{s.imageDescription || 'Image'}</p>
                 </div>
               )}
               <ul className="space-y-3">{s.bullets.map((b, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</li>
+                <motion.li key={i} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.1 }}
+                  className="flex items-start gap-3 text-sm text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</motion.li>
               ))}</ul>
             </div>
           </div>
         );
       case 'section':
         return (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="mb-4 h-1 w-16 rounded-full bg-accent" />
-            <h3 className="text-3xl font-bold text-accent">{s.title}</h3>
+          <div className="flex h-full flex-col items-center justify-center text-center relative overflow-hidden">
+            <motion.div className="absolute top-10 right-12 w-28 h-28 rounded-full opacity-10"
+              animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ background: schemeColors[2] }} />
+            <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ type: 'spring', stiffness: 150, damping: 15, delay: 0.1 }} className="mb-6 h-1 w-20 rounded-full bg-white/40" />
+            <motion.h3 initial={{ opacity: 0, y: 40, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 18, delay: 0.25 }}
+              className="text-3xl font-extrabold text-white sm:text-4xl">{s.title}</motion.h3>
           </div>
         );
       case 'timeline':
         return (
           <div className="flex h-full flex-col justify-center">
             <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
-            <div className="relative space-y-4 pl-6 border-l-2 border-accent/30">
+            <div className="relative space-y-5 pl-6 border-l-2" style={{ borderLeftColor: `${schemeColors[0]}40` }}>
               {(s.timelineItems || []).map((item, i) => (
-                <div key={i} className="relative">
-                  <div className="absolute -left-[25px] top-1 h-3 w-3 rounded-full bg-accent" />
-                  <p className="text-xs font-bold text-accent uppercase tracking-wide">{item.date}</p>
+                <motion.div key={i} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className="relative">
+                  <div className="absolute -left-[25px] top-1 h-3 w-3 rounded-full" style={{ background: schemeColors[0] }} />
+                  <p className="text-xs font-bold uppercase tracking-wide" style={{ color: schemeColors[0] }}>{item.date}</p>
                   <p className="text-sm text-text-secondary mt-0.5">{item.event}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -483,10 +902,12 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
             <h3 className="mb-8 text-2xl font-bold text-text-primary text-center">{s.title}</h3>
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
               {(s.stats || []).map((stat, i) => (
-                <div key={i} className="text-center">
-                  <p className="text-3xl font-bold text-accent">{stat.value}</p>
+                <motion.div key={i} initial={{ opacity: 0, y: 40, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.15 }}
+                  className="text-center rounded-xl bg-bg-secondary/80 backdrop-blur-sm p-4 shadow-lg">
+                  <p className="text-3xl font-extrabold" style={{ color: schemeColors[0] }}>{stat.value}</p>
                   <p className="mt-1 text-sm text-text-muted">{stat.label}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -497,36 +918,42 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
             <h3 className="mb-6 text-2xl font-bold text-text-primary">{s.title}</h3>
             <div className="space-y-4">
               {(s.steps || []).map((step, i) => (
-                <div key={i} className="flex items-start gap-4">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{i + 1}</div>
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">{step.label}</p>
+                <motion.div key={i} initial={{ opacity: 0, x: -30, y: 10 }} animate={{ opacity: 1, x: 0, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.15 + i * 0.12 }}
+                  className="flex items-start gap-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ background: schemeColors[0] }}>{i + 1}</div>
+                  <div className="flex-1 border-b border-border pb-3">
+                    <p className="text-sm font-bold text-text-primary">{step.label}</p>
                     <p className="text-sm text-text-secondary mt-0.5">{step.description}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         );
-      default:
+      default: // content
         return (
           <div className="flex h-full flex-col justify-center">
-            <p className="mb-1 text-xs font-medium text-text-muted uppercase tracking-wide">Slide {currentSlide + 1} of {presentation!.slides.length}</p>
-            <h3 className="mb-6 text-2xl font-bold text-text-primary sm:text-3xl">{s.title}</h3>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+              className="mb-1 text-xs font-medium text-text-muted uppercase tracking-wide">Slide {currentSlide + 1} of {presentation!.slides.length}</motion.p>
+            <motion.h3 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              className="mb-6 text-2xl font-bold text-text-primary sm:text-3xl">{s.title}</motion.h3>
             <div className={s.imageDescription ? 'grid grid-cols-3 gap-6' : ''}>
               <ul className={`space-y-3 ${s.imageDescription ? 'col-span-2' : ''}`}>
                 {s.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-3 text-base text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</li>
+                  <motion.li key={i} initial={{ opacity: 0, x: -25 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: 'spring', stiffness: 120, damping: 16, delay: 0.2 + i * 0.1 }}
+                    className="flex items-start gap-3 text-base text-text-secondary"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />{b}</motion.li>
                 ))}
               </ul>
               {s.imageDescription && (
                 s.imageUrl ? (
-                  <div className="overflow-hidden rounded-lg">
+                  <div className="overflow-hidden rounded-xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.imageUrl} alt={s.imageDescription} className="h-full w-full object-cover rounded-lg" />
+                    <img src={s.imageUrl} alt={s.imageDescription} className="h-full w-full object-cover rounded-xl" />
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-bg-secondary p-4">
+                  <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-bg-secondary p-4">
                     <p className="text-xs italic text-text-muted text-center">{s.imageDescription}</p>
                   </div>
                 )
@@ -754,10 +1181,16 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
               )}
 
               {/* Generate Button */}
-              <button onClick={generatePresentation} disabled={loading || !topic.trim()}
-                className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {loading ? <><LoadingSpinner className="h-4 w-4" /> Generating...</> : 'Generate Presentation'}
-              </button>
+              <div className="flex gap-3">
+                <button onClick={generatePresentation} disabled={loading || !topic.trim()}
+                  className="flex-1 rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  {loading ? <><LoadingSpinner className="h-4 w-4" /> Generating...</> : 'Generate Presentation'}
+                </button>
+                <button onClick={loadDemo}
+                  className="rounded-lg border border-border px-4 py-3 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors">
+                  Load Demo
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
@@ -775,6 +1208,7 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                 ))}
               </div>
               <button onClick={() => setShowNotes(!showNotes)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">{showNotes ? 'Hide Notes' : 'Notes'}</button>
+              <button onClick={exportPPTX} disabled={exporting} className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-40">{exporting ? 'Exporting...' : 'Export PPTX'}</button>
               <button onClick={exportAsText} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Export MD</button>
               <button onClick={exportAsHTML} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Export HTML</button>
               <button onClick={toggleFullscreen} className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover">Fullscreen</button>
@@ -785,21 +1219,27 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
           {/* View: Slide */}
           {viewMode === 'slide' && (
             <div ref={presentRef} className={fullscreen ? 'fixed inset-0 z-50 flex flex-col bg-bg-primary p-8' : ''}>
-              <AnimatePresence mode="wait">
-                {slide && (
-                  <motion.div
-                    key={currentSlide}
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -30 }}
-                    transition={{ duration: 0.2 }}
-                    className={`rounded-xl border border-border bg-bg-card ${fullscreen ? 'flex-1 flex flex-col justify-center' : 'aspect-video'} p-8 sm:p-12`}
-                    style={{ boxShadow: 'var(--card-shadow)' }}
-                  >
-                    {renderSlide(slide)}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* True morph: slides overlap during transition (like PowerPoint morph) */}
+              <div className={`relative ${fullscreen ? 'flex-1' : 'aspect-video'}`}>
+                <AnimatePresence>
+                  {slide && (
+                    <motion.div
+                      key={currentSlide}
+                      initial={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.in || {}) }}
+                      animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
+                      exit={{ opacity: 0, ...(TRANSITION_VARIANTS[transition]?.out || {}) }}
+                      transition={TRANSITION_TIMING[transition] || { duration: 0.5 }}
+                      className={`absolute inset-0 rounded-xl ${isGradientSlide(slide.layout) ? '' : 'border border-border bg-bg-card'} p-8 sm:p-12 overflow-hidden`}
+                      style={{
+                        boxShadow: 'var(--card-shadow)',
+                        ...(getSlideBackground(slide.layout, schemeColors) ? { background: getSlideBackground(slide.layout, schemeColors) } : {}),
+                      }}
+                    >
+                      <div className="h-full">{renderSlide(slide)}</div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {showNotes && slide && (
                 <div className="mt-3 rounded-lg border border-border bg-bg-secondary p-4">
@@ -811,10 +1251,12 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
               <div className="mt-4 flex items-center justify-between">
                 <button onClick={() => goToSlide(currentSlide - 1)} disabled={currentSlide === 0}
                   className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
-                <div className="flex gap-1">
+                <div className="flex gap-1.5 items-center">
                   {presentation.slides.map((_, i) => (
-                    <button key={i} onClick={() => setCurrentSlide(i)}
-                      className={`h-2 rounded-full transition-all ${i === currentSlide ? 'w-6 bg-accent' : 'w-2 bg-border hover:bg-text-muted'}`} />
+                    <motion.button key={i} onClick={() => setCurrentSlide(i)}
+                      animate={{ width: i === currentSlide ? 28 : 8, backgroundColor: i === currentSlide ? 'var(--color-accent)' : 'var(--color-border)' }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                      className="h-2 rounded-full hover:opacity-80" />
                   ))}
                 </div>
                 <button onClick={() => goToSlide(currentSlide + 1)} disabled={currentSlide >= presentation.slides.length - 1}

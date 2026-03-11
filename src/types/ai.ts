@@ -22,9 +22,9 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   free: {
     type: 'free',
     name: 'Free (Built-in)',
-    description: 'Powered by Gemini Flash — no setup needed, 25 requests/day',
-    models: ['gemini-2.0-flash'],
-    defaultModel: 'gemini-2.0-flash',
+    description: 'Powered by Gemini 2.5 Flash — no setup needed, 50 requests/day',
+    models: ['gemini-2.5-flash-preview-05-20'],
+    defaultModel: 'gemini-2.5-flash-preview-05-20',
     supportsVision: true,
     requiresApiKey: false,
   },
