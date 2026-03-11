@@ -43,6 +43,12 @@ export default function UploadPage() {
   };
 
   const processFile = async (file: File) => {
+    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+    if (file.size > MAX_SIZE) {
+      toast.error(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`);
+      return;
+    }
+
     const id = crypto.randomUUID();
     let text = '';
     let sourceType: 'text' | 'pdf' | 'image' = 'text';

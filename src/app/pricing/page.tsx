@@ -144,10 +144,10 @@ export default function PricingPage() {
 
       <div className="mt-12 text-center">
         <p className="text-2xl font-bold gradient-text inline-block">
-          I&apos;m too lazy to code this rn
+          All features are free during beta
         </p>
-        <p className="text-xs text-text-muted mt-4">
-          Currently in beta — all Pro features are available for free during the beta period.
+        <p className="text-sm text-text-secondary mt-3 max-w-md mx-auto">
+          We&apos;re in beta — enjoy every feature at no cost. Paid plans will launch soon with even more power.
         </p>
         <a
           href="https://www.snapchat.com/add/arthurgaye24"

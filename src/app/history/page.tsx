@@ -31,6 +31,7 @@ export default function HistoryPage() {
   }, []);
 
   const deleteEssay = (id: string) => {
+    if (!confirm('Delete this essay? This cannot be undone.')) return;
     const updated = essays.filter(e => e.id !== id);
     setEssays(updated);
     setItem('generated_essays', updated);
@@ -38,6 +39,7 @@ export default function HistoryPage() {
   };
 
   const deletePresentation = (id: string) => {
+    if (!confirm('Delete this presentation? This cannot be undone.')) return;
     const updated = presentations.filter(p => p.id !== id);
     setPresentations(updated);
     setItem('generated_presentations', updated);
