@@ -57,8 +57,8 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   },
   'claude-cli': {
     type: 'claude-cli',
-    name: 'Claude CLI',
-    description: 'Uses your Claude subscription via the installed CLI',
+    name: 'Claude CLI (Local Only)',
+    description: 'Uses your Claude subscription via the installed CLI — only works on your computer, not on the web',
     models: ['claude-cli'],
     defaultModel: 'claude-cli',
     supportsVision: false,
@@ -75,9 +75,9 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   },
   ollama: {
     type: 'ollama',
-    name: 'Ollama (Local)',
-    description: 'Run models locally on your device — no API key needed',
-    models: ['llama3.2', 'mistral', 'gemma2', 'phi3', 'qwen2.5'],
+    name: 'Ollama (Local Only)',
+    description: 'Run models locally on your computer — only works on localhost, not on the web. Install from ollama.com',
+    models: ['llama3.2', 'llama3.1', 'llama3.3', 'mistral', 'mixtral', 'gemma2', 'gemma3', 'phi3', 'phi4', 'qwen2.5', 'qwen3', 'deepseek-r1', 'codellama', 'llava', 'command-r'],
     defaultModel: 'llama3.2',
     supportsVision: false,
     requiresApiKey: false,
