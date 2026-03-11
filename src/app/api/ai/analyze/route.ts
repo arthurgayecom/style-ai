@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createProvider } from '@/lib/ai/providers';
 import { ANALYSIS_SYSTEM_PROMPT, AGGREGATION_SYSTEM_PROMPT, buildAggregationPrompt } from '@/lib/analysis/prompts';
+import { parseAIJSON } from '@/lib/ai/parseJSON';
 import type { ProviderConfig } from '@/types/ai';
 
 export async function POST(req: NextRequest) {
@@ -22,14 +23,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing essayText or systemPrompt' }, { status: 400 });
       }
       const result = await provider.analyze(essayText, systemPrompt);
-      let parsed;
       try {
-        const jsonStr = result.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(jsonStr);
+        const parsed = parseAIJSON(result);
+        return NextResponse.json({ analysis: parsed });
       } catch {
         return NextResponse.json({ analysis: null, raw: result });
       }
-      return NextResponse.json({ analysis: parsed });
     }
 
     if (mode === 'analyze') {
@@ -40,17 +39,12 @@ export async function POST(req: NextRequest) {
 
       const result = await provider.analyze(essayText, ANALYSIS_SYSTEM_PROMPT);
 
-      // Try to parse JSON from the response
-      let analysis;
       try {
-        // Handle cases where AI wraps in code blocks
-        const jsonStr = result.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        analysis = JSON.parse(jsonStr);
+        const analysis = parseAIJSON(result);
+        return NextResponse.json({ analysis });
       } catch {
         return NextResponse.json({ error: 'Failed to parse analysis response', raw: result }, { status: 500 });
       }
-
-      return NextResponse.json({ analysis });
     }
 
     if (mode === 'aggregate') {
@@ -62,18 +56,15 @@ export async function POST(req: NextRequest) {
       const prompt = buildAggregationPrompt(analyses);
       const result = await provider.analyze(prompt, AGGREGATION_SYSTEM_PROMPT);
 
-      let aggregated;
       try {
-        const jsonStr = result.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        aggregated = JSON.parse(jsonStr);
+        const aggregated = parseAIJSON<{ dimensions: unknown; fingerprint: unknown }>(result);
+        return NextResponse.json({
+          dimensions: aggregated.dimensions,
+          fingerprint: aggregated.fingerprint,
+        });
       } catch {
         return NextResponse.json({ error: 'Failed to parse aggregation response', raw: result }, { status: 500 });
       }
-
-      return NextResponse.json({
-        dimensions: aggregated.dimensions,
-        fingerprint: aggregated.fingerprint,
-      });
     }
 
     return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });

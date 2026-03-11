@@ -88,10 +88,10 @@ export default function LearnPage() {
       if (data.analysis && data.analysis.grade) {
         parsed = data.analysis;
       } else if (data.raw) {
-        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned);
+        const { parseAIJSON } = await import('@/lib/ai/parseJSON');
+        parsed = parseAIJSON<GradingResult>(data.raw);
       } else {
-        throw new Error('Could not parse grading response');
+        throw new Error('AI returned an empty response — try again or use a different AI provider');
       }
       setResult(parsed);
       setTab('grade');

@@ -84,10 +84,10 @@ export default function VideoPage() {
       if (data.analysis?.segments) {
         parsed = data.analysis;
       } else if (data.raw) {
-        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned);
+        const { parseAIJSON } = await import('@/lib/ai/parseJSON');
+        parsed = parseAIJSON<PodcastScript>(data.raw);
       } else {
-        throw new Error('Could not parse podcast script');
+        throw new Error('AI returned an empty response — try again or use a different AI provider');
       }
 
       setScript(parsed);

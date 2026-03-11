@@ -177,10 +177,10 @@ Return ONLY valid JSON (no code blocks):
       if (data.analysis?.aiScore !== undefined) {
         parsed = data.analysis;
       } else if (data.raw) {
-        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned);
+        const { parseAIJSON } = await import('@/lib/ai/parseJSON');
+        parsed = parseAIJSON<AIDetectionResult>(data.raw);
       } else {
-        throw new Error('Could not parse detection result');
+        throw new Error('AI returned an empty response — try again or use a different AI provider');
       }
 
       setDetectionResult(parsed);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseAIJSON } from '@/lib/ai/parseJSON';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MODEL = 'gemini-2.5-flash';
@@ -57,8 +58,8 @@ async function callGemini(contents: unknown[], systemInstruction?: string, strea
     body.systemInstruction = { parts: [{ text: systemInstruction }] };
   }
 
-  const endpoint = stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
-  const res = await fetch(`${GEMINI_BASE}/${MODEL}:${endpoint}&key=${apiKey}`, {
+  const endpoint = stream ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+  const res = await fetch(`${GEMINI_BASE}/${MODEL}:${endpoint}key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -109,8 +110,7 @@ export async function POST(req: NextRequest) {
 
       let parsed;
       try {
-        const jsonStr = text.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(jsonStr);
+        parsed = parseAIJSON(text);
       } catch {
         return NextResponse.json({ analysis: null, raw: text, remaining }, {
           headers: { 'X-RateLimit-Remaining': String(remaining) }

@@ -364,10 +364,10 @@ export default function PresentPage() {
       if (data.analysis?.slides) {
         parsed = data.analysis;
       } else if (data.raw) {
-        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned);
+        const { parseAIJSON } = await import('@/lib/ai/parseJSON');
+        parsed = parseAIJSON<Presentation>(data.raw);
       } else {
-        throw new Error('Could not parse presentation');
+        throw new Error('AI returned an empty response — try again or use a different AI provider');
       }
 
       parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content' }));

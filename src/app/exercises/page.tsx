@@ -260,8 +260,11 @@ function ExercisesPage() {
       if (data.analysis?.exercises) {
         parsed = data.analysis.exercises;
       } else if (data.raw) {
-        const cleaned = data.raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned).exercises;
+        const { parseAIJSON } = await import('@/lib/ai/parseJSON');
+        const result = parseAIJSON<{ exercises: Exercise[] }>(data.raw);
+        parsed = result.exercises;
+      } else {
+        throw new Error('AI returned an empty response — try again or use a different AI provider');
       }
 
       if (parsed && Array.isArray(parsed)) {

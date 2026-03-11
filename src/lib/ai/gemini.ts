@@ -9,8 +9,8 @@ export function createGeminiProvider(apiKey: string, model: string): AIProvider 
       body.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
 
-    const endpoint = stream ? 'streamGenerateContent?alt=sse' : 'generateContent';
-    const res = await fetch(`${BASE}/${model}:${endpoint}&key=${apiKey}`, {
+    const endpoint = stream ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+    const res = await fetch(`${BASE}/${model}:${endpoint}key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
