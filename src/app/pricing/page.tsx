@@ -142,16 +142,21 @@ export default function PricingPage() {
         ))}
       </motion.div>
 
-      <div className="mt-12 text-center">
-        <p className="text-2xl font-bold gradient-text inline-block">
-          Arthur wants MONEYYYYYYYY
+      <div className="mt-12 rounded-xl border border-accent/20 bg-accent/5 p-6 text-center">
+        <p className="text-lg font-bold text-text-primary mb-2">
+          Currently in Open Beta
         </p>
-        <p className="text-sm text-text-muted mt-2">
-          I&apos;m too lazy to work on this yet tho
+        <p className="text-sm text-text-secondary max-w-lg mx-auto">
+          All features are free during the beta period. Pro and Teacher plans are coming soon — you&apos;ll be the first to know when they launch.
         </p>
-        <p className="text-xs text-text-muted mt-4">
-          Currently in beta — all Pro features are available for free during the beta period.
-        </p>
+        <a
+          href="https://www.snapchat.com/add/arthurgaye24"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 mt-4 rounded-full bg-yellow-500 px-5 py-2.5 text-sm font-bold text-black hover:bg-yellow-400 transition-all hover:scale-105"
+        >
+          <span>👻</span> Follow @arthurgaye24 for updates
+        </a>
       </div>
     </motion.div>
   );

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useStyleProfile } from '@/hooks/useStyleProfile';
 import { useEssays } from '@/hooks/useEssays';
 import { useAIProvider } from '@/hooks/useAIProvider';
-import { getItem, setItem } from '@/lib/storage/localStorage';
+import { getItem } from '@/lib/storage/localStorage';
 import { getConfidenceColor, getRecommendation } from '@/lib/analysis/confidence';
 import { getDayStreak, getWeeklyActivity, recordActivity } from '@/lib/streak';
 import { PROVIDERS } from '@/types/ai';
@@ -67,7 +67,6 @@ export default function DashboardPage() {
   const [learningStats, setLearningStats] = useState({ essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 });
   const [dayStreak, setDayStreak] = useState(0);
   const [weeklyActivity, setWeeklyActivity] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-  const [snapBannerDismissed, setSnapBannerDismissed] = useState(true);
 
   useEffect(() => {
     recordActivity();
@@ -75,7 +74,6 @@ export default function DashboardPage() {
     setLearningStats(getItem('learning_stats', { essaysGraded: 0, exercisesDone: 0, streak: 0, lecturesRecorded: 0 }));
     setDayStreak(getDayStreak());
     setWeeklyActivity(getWeeklyActivity());
-    setSnapBannerDismissed(getItem<boolean>('snap_banner_dismissed', false));
   }, []);
 
   const analyzedCount = essays.filter((e) => e.status === 'analyzed').length;
@@ -97,39 +95,32 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Snapchat Banner */}
-      {!snapBannerDismissed && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 relative rounded-xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 via-yellow-500/10 to-yellow-500/5 p-4"
-        >
-          <button
-            onClick={() => { setSnapBannerDismissed(true); setItem('snap_banner_dismissed', true); }}
-            className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-yellow-500/20 text-xl">
-              👻
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-text-primary leading-relaxed">
-                Help us keep CDL Study free! If you have any Google accounts you can donate for more free credits, or ideas for the app, add me on Snapchat
-              </p>
-            </div>
-            <a
-              href="https://www.snapchat.com/add/arthurgaye24"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 rounded-full bg-yellow-500 px-4 py-2 text-sm font-bold text-black hover:bg-yellow-400 transition-colors"
-            >
-              @arthurgaye24
-            </a>
+      {/* Snapchat Banner — always visible */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8 rounded-xl border-2 border-yellow-500/40 bg-gradient-to-r from-yellow-500/10 via-yellow-500/15 to-yellow-500/10 p-5"
+      >
+        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-yellow-500/25 text-2xl">
+            👻
           </div>
-        </motion.div>
-      )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-text-primary mb-0.5">Got ideas? Want to help keep CDL Study free?</p>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Donate spare Google accounts for free AI credits, report bugs, or suggest features — add me on Snapchat!
+            </p>
+          </div>
+          <a
+            href="https://www.snapchat.com/add/arthurgaye24"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 rounded-full bg-yellow-500 px-5 py-2.5 text-sm font-bold text-black hover:bg-yellow-400 transition-all hover:scale-105 shadow-lg shadow-yellow-500/20"
+          >
+            Add @arthurgaye24
+          </a>
+        </div>
+      </motion.div>
 
       {/* How It Works — clear 3-step workflow */}
       <div className="mb-8">
@@ -233,7 +224,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Manage Row */}
-      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+      <div className="mb-8 grid gap-3 sm:grid-cols-4">
         <Link href="/upload" className="flex items-center gap-3 rounded-xl border border-border bg-bg-card p-3.5 transition-all hover:border-accent hover:bg-accent/5" style={{ boxShadow: 'var(--card-shadow)' }}>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
@@ -250,6 +241,15 @@ export default function DashboardPage() {
           <div>
             <p className="text-sm font-semibold text-text-primary">History</p>
             <p className="text-xs text-text-muted">All past essays & decks</p>
+          </div>
+        </Link>
+        <Link href="/pricing" className="flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/5 p-3.5 transition-all hover:border-accent hover:bg-accent/10" style={{ boxShadow: 'var(--card-shadow)' }}>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-text-primary">Pricing</p>
+            <p className="text-xs text-accent font-medium">Coming Soon</p>
           </div>
         </Link>
         <Link href="/setup" className="flex items-center gap-3 rounded-xl border border-border bg-bg-card p-3.5 transition-all hover:border-accent hover:bg-accent/5" style={{ boxShadow: 'var(--card-shadow)' }}>

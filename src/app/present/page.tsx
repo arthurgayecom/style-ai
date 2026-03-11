@@ -284,7 +284,7 @@ export default function PresentPage() {
 
   // Core
   const [topic, setTopic] = useState('');
-  const [slideCount, setSlideCount] = useState(10);
+  const [slideCount, setSlideCount] = useState(8);
   const [audience, setAudience] = useState('general');
   const [language, setLanguage] = useState('english');
   const [imageSource, setImageSource] = useState('descriptions');
@@ -1044,9 +1044,9 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
                   <label className="text-sm font-medium text-text-primary">Slides</label>
                   <span className="text-sm font-bold text-accent">{slideCount}</span>
                 </div>
-                <input type="range" min={3} max={40} value={slideCount} onChange={(e) => setSlideCount(Number(e.target.value))}
+                <input type="range" min={3} max={20} value={slideCount} onChange={(e) => setSlideCount(Number(e.target.value))}
                   className="w-full accent-accent" />
-                <div className="flex justify-between text-[10px] text-text-muted mt-0.5"><span>3</span><span>40</span></div>
+                <div className="flex justify-between text-[10px] text-text-muted mt-0.5"><span>3</span><span>20</span></div>
               </div>
 
               {/* Style pills */}
