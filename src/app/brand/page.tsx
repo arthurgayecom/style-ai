@@ -30,8 +30,10 @@ export default function BrandPage() {
     { key: 'all', label: 'All Pieces' },
     { key: 'hoodie', label: 'Hoodies' },
     { key: 'pants', label: 'Pants' },
+    { key: 'jeans', label: 'Jeans' },
     { key: 'tee', label: 'Tees' },
     { key: 'jacket', label: 'Jackets' },
+    { key: 'windbreaker', label: 'Windbreakers' },
     { key: 'shorts', label: 'Shorts' },
   ];
 
@@ -53,7 +55,7 @@ export default function BrandPage() {
           </span>
         </h1>
         <p className="text-text-secondary">
-          20 pieces of baggy, oversized streetwear — designed with AI
+          Baggy, oversized streetwear — designed with AI
         </p>
         <div className="mt-4 flex items-center justify-center gap-3 text-sm text-text-muted">
           <span className="rounded-full border border-border px-3 py-1">{designs.length} Designs</span>

@@ -138,5 +138,61 @@
     "image": "/brand/design_20.jpg",
     "description": "Two-tone black and electric blue oversized windbreaker jacket in lightweight nylon with a boxy fit and half-zip high collar. Elasticated cuffs and hem with a chest zip pocket and reflective logo on back channel 90s sportswear energy into modern streetwear.",
     "instructions": "Two-tone black and electric blue oversized windbreaker jacket, lightweight nylon shell, boxy fit, half-zip with high collar, elasticated cuffs and hem, one chest pocket with zip, reflective logo on back, 90s sportswear streetwear"
+  },
+  {
+    "id": "21",
+    "garmentType": "AK baggy sweatpants",
+    "image": "/brand/design_21.jpg",
+    "description": "Heather gray baggy sweatpants with a large AK-47 rifle graphic printed vertically up the right leg in black ink. Clean Burberry-inspired tartan plaid double waistband, open straight leg hem with no cuffs, heavyweight cotton fleece in an oversized relaxed fit. No side logos — pure streetwear minimalism.",
+    "instructions": "Heather gray baggy sweatpants, large AK-47 rifle graphic printed vertically going up right leg in black ink, clean Burberry-inspired tartan plaid double waistband, no elastic cuffs open straight leg hem, heavyweight cotton fleece, oversized relaxed fit, no logos on sides, streetwear"
+  },
+  {
+    "id": "22",
+    "garmentType": "cropped windbreaker",
+    "image": "/brand/design_22.jpg",
+    "description": "Black oversized cropped windbreaker with adjustable drawstring waistband and toggle hem. Half-zip front with high funnel collar, lightweight waterproof nylon shell in a boxy cropped fit hitting at the waist. Velcro cuff adjusters and hidden hood in collar complete the Mertras-inspired streetwear silhouette.",
+    "instructions": "Black oversized cropped windbreaker, adjustable drawstring waistband with elastic toggle hem, half-zip front, high funnel collar, lightweight waterproof nylon shell, boxy cropped fit at waist, velcro cuff adjusters, hidden hood in collar, Mertras-inspired streetwear"
+  },
+  {
+    "id": "23",
+    "garmentType": "retro windbreaker",
+    "image": "/brand/design_23.jpg",
+    "description": "Navy blue and white color-blocked oversized windbreaker with adjustable waistband cinch and full zip front. Retro side stripe detailing with mesh lining visible at the collar, oversized boxy fit, zippered chest pocket, and elastic cuffs deliver vintage sportswear energy.",
+    "instructions": "Navy blue and white color-blocked oversized windbreaker, adjustable waistband cinch, full zip front, retro side stripe detailing, mesh lining, oversized boxy fit, zippered chest pocket, elastic cuffs, vintage sportswear streetwear"
+  },
+  {
+    "id": "24",
+    "garmentType": "Gore-Tex cropped jacket",
+    "image": "/brand/design_24.jpg",
+    "description": "Stone gray oversized cropped Gore-Tex waterproof jacket with sealed seams and a boxy silhouette cropped above the hip. Hidden hood with brim, large flap cargo pockets, adjustable velcro cuffs, and technical waterproof membrane fabric bring techwear functionality to streetwear proportions.",
+    "instructions": "Stone gray oversized cropped Gore-Tex waterproof jacket, boxy silhouette cropped above hip, sealed seams, hidden hood with brim, large flap cargo pockets, adjustable velcro cuffs, technical waterproof membrane, techwear streetwear"
+  },
+  {
+    "id": "25",
+    "garmentType": "JDM car graphic tee",
+    "image": "/brand/design_25.jpg",
+    "description": "Black oversized graphic t-shirt featuring a large vintage Japanese drift car illustration across the front in white and red ink. JDM sports car artwork on washed heavyweight cotton with a boxy dropped shoulder fit and ribbed crew neck for underground car culture streetwear.",
+    "instructions": "Black oversized graphic t-shirt, large vintage Japanese drift car illustration on front in white and red ink, JDM sports car artwork, washed heavyweight cotton, boxy dropped shoulder fit, ribbed crew neck, car culture streetwear"
+  },
+  {
+    "id": "26",
+    "garmentType": "muscle car graphic tee",
+    "image": "/brand/design_26.jpg",
+    "description": "White oversized graphic t-shirt with a large classic American muscle car illustration on the back in black ink. Vintage car show poster style artwork on heavyweight 300 GSM cotton with a massively oversized boxy fit and raw hem for retro automotive streetwear.",
+    "instructions": "White oversized graphic t-shirt, large classic American muscle car illustration on back in black ink, vintage car show poster style, heavyweight 300 GSM cotton, massively oversized boxy fit, raw hem, automotive streetwear"
+  },
+  {
+    "id": "27",
+    "garmentType": "super baggy jeans",
+    "image": "/brand/design_27.jpg",
+    "description": "Black super baggy wide-leg jeans in heavy raw denim with an extremely relaxed oversized fit. Five pocket styling with contrast white topstitching, ultra wide barrel leg silhouette, and low crotch drop channel JNCO-era 90s baggy denim energy.",
+    "instructions": "Black super baggy wide-leg jeans, extremely relaxed oversized fit, heavy raw denim, five pocket styling, contrast white topstitching, ultra wide barrel leg, low crotch drop, JNCO style 90s streetwear"
+  },
+  {
+    "id": "28",
+    "garmentType": "baggy carpenter jeans",
+    "image": "/brand/design_28.jpg",
+    "description": "Light blue washed super baggy carpenter jeans with ultra wide legs, double knee reinforcement, and a hammer loop with tool pockets on the right leg. Distressed wash with whiskering and contrast yellow topstitching bring workwear utility to oversized streetwear denim.",
+    "instructions": "Light blue washed super baggy carpenter jeans, ultra wide leg, double knee reinforcement, hammer loop and tool pockets on right leg, distressed wash with whiskering, contrast yellow topstitching, oversized relaxed fit, workwear streetwear"
   }
 ]
