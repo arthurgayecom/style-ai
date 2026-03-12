@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseAIJSON } from '@/lib/ai/parseJSON';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+// gemini-2.5-flash supports image gen via responseModalities: ['TEXT','IMAGE']
+// Dedicated image models (gemini-2.5-flash-image) have 0 free-tier quota
+const IMAGE_MODEL = 'gemini-2.5-flash';
 const TEXT_MODEL = 'gemini-2.5-flash';
 
 function getGeminiKeys(): string[] {
@@ -50,6 +52,9 @@ async function callGemini(
 
     const err = await res.json().catch(() => ({}));
     const msg = err?.error?.message || '';
+    if (msg.toLowerCase().includes('not available in your country')) {
+      throw new Error('Image generation is not available in your region. The app works on Vercel (US servers).');
+    }
     const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
     if (isQuota && i < keys.length - 1) continue;
     throw new Error(msg || `AI error (${res.status})`);
