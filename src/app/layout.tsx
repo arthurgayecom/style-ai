@@ -3,8 +3,10 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AIProviderProvider } from '@/context/AIProviderContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { AppModeProvider } from '@/context/AppModeContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Navbar } from '@/components/layout/Navbar';
+import { ModeToggle } from '@/components/layout/ModeToggle';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -47,11 +49,13 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
           <AIProviderProvider>
+          <AppModeProvider>
             <ErrorBoundary>
             <Navbar />
             <main className="mx-auto max-w-6xl px-4 py-8">
               {children}
             </main>
+            <ModeToggle />
             </ErrorBoundary>
             <Toaster
               position="bottom-right"
@@ -63,6 +67,7 @@ export default function RootLayout({
                 },
               }}
             />
+          </AppModeProvider>
           </AIProviderProvider>
           </AuthProvider>
         </ThemeProvider>

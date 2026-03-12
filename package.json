@@ -13,12 +13,15 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.99.0",
     "framer-motion": "^12.35.2",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "next": "16.1.6",
     "openai": "^6.27.0",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "replicate": "^1.4.0",
     "sonner": "^2.0.7"
   },
   "devDependencies": {
