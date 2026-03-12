@@ -34,6 +34,8 @@ export default function VideoPage() {
   const [brainrot, setBrainrot] = useState(false);
   const [selectedBg, setSelectedBg] = useState<Background>(BACKGROUNDS[0]);
   const [customUrl, setCustomUrl] = useState('');
+  const [bgOpacity, setBgOpacity] = useState(40);
+  const [textMode, setTextMode] = useState<'word' | 'line' | 'all'>('word');
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -209,7 +211,8 @@ export default function VideoPage() {
               <video
                 ref={videoRef}
                 src={bgUrl}
-                className="absolute inset-0 h-full w-full object-cover opacity-40"
+                className="absolute inset-0 h-full w-full object-cover"
+                style={{ opacity: bgOpacity / 100 }}
                 muted autoPlay loop playsInline
               />
             )}
@@ -234,20 +237,26 @@ export default function VideoPage() {
                     </div>
                     <div className="text-center px-2">
                       <p className="text-lg font-bold leading-relaxed">
-                        {words.map((word, i) => (
-                          <span
-                            key={i}
-                            className={`inline-block mx-0.5 transition-all duration-150 ${
-                              i === currentWord
-                                ? 'text-white scale-110'
-                                : i < currentWord
-                                  ? 'text-white/70'
-                                  : 'text-white/30'
-                            }`}
-                          >
-                            {word}
-                          </span>
-                        ))}
+                        {textMode === 'all' ? (
+                          <span className="text-white">{currentSeg.text}</span>
+                        ) : textMode === 'line' ? (
+                          <span className="text-white">{words.slice(0, currentWord + 1).join(' ')}</span>
+                        ) : (
+                          words.map((word, i) => (
+                            <span
+                              key={i}
+                              className={`inline-block mx-0.5 transition-all duration-150 ${
+                                i === currentWord
+                                  ? 'text-white scale-110'
+                                  : i < currentWord
+                                    ? 'text-white/70'
+                                    : 'text-white/30'
+                              }`}
+                            >
+                              {word}
+                            </span>
+                          ))
+                        )}
                       </p>
                     </div>
                   </>
@@ -305,6 +314,31 @@ export default function VideoPage() {
                 </button>
               </div>
             </div>
+
+            {/* Text Animation */}
+            <div className="col-span-2 mt-2">
+              <label className="mb-1 block text-sm font-medium text-text-primary">Text Animation</label>
+              <div className="flex gap-1">
+                {([['word', 'Word by Word'], ['line', 'Line by Line'], ['all', 'All at Once']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setTextMode(key)}
+                    className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all ${textMode === key ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Background Opacity */}
+            {brainrot && (
+              <div className="col-span-2 mt-2">
+                <label className="mb-1 block text-sm font-medium text-text-primary">Background Opacity: {bgOpacity}%</label>
+                <input
+                  type="range" min={10} max={100} value={bgOpacity}
+                  onChange={(e) => setBgOpacity(Number(e.target.value))}
+                  className="w-full accent-accent"
+                />
+              </div>
+            )}
 
             {/* Background selector */}
             {brainrot && (

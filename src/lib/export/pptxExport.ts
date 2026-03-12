@@ -51,9 +51,10 @@ export async function exportAsPPTX({
   pptx.author = 'CDL Study Tool';
   pptx.layout = 'LAYOUT_WIDE';
 
-  const c1 = hexToRgb(colors[0]);
-  const c2 = hexToRgb(colors[1]);
-  const c3 = hexToRgb(colors[2]);
+  const safeColors = colors?.length >= 3 ? colors : ['#6366f1', '#8b5cf6', '#a78bfa'];
+  const c1 = hexToRgb(safeColors[0]);
+  const c2 = hexToRgb(safeColors[1]);
+  const c3 = hexToRgb(safeColors[2]);
 
   for (const s of presentation.slides) {
     const slide = pptx.addSlide();

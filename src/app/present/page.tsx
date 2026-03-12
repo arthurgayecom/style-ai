@@ -246,7 +246,7 @@ Make it engaging, NOT generic AI text. Every slide MUST have speaker notes. Use 
 const GRADIENT_LAYOUTS = new Set(['big_statement', 'section', 'closing', 'title', 'highlight_box']);
 
 function getSlideBackground(layout: string, colors: string[]): string | undefined {
-  if (!GRADIENT_LAYOUTS.has(layout)) return undefined;
+  if (!colors?.length || !GRADIENT_LAYOUTS.has(layout)) return undefined;
   // jacobppt/lourrutia.ppt: dark-blended gradients, 2-3 color smooth blends, subtle mid-stop transparency
   if (layout === 'big_statement' || layout === 'closing') {
     return `linear-gradient(135deg, ${colors[0]}, ${colors[1]}, ${colors[0]}bb)`;
@@ -389,7 +389,7 @@ export default function PresentPage() {
         throw new Error('AI returned an empty response — try again.');
       }
 
-      parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content' }));
+      parsed.slides = parsed.slides.map(s => ({ ...s, layout: s.layout || 'content', bullets: s.bullets || [] }));
 
       // Fetch real images for slides with imageDescription
       if (imageSource === 'descriptions') {
@@ -515,7 +515,7 @@ export default function PresentPage() {
 
   const exportAsHTML = () => {
     if (!presentation) return;
-    const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+    const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors ?? COLOR_SCHEMES[0]?.colors ?? ['#6366f1', '#8b5cf6', '#a78bfa'];
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${presentation.title}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
@@ -548,7 +548,7 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
     if (!presentation) return;
     setExporting(true);
     try {
-      const colors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+      const colors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors ?? COLOR_SCHEMES[0]?.colors ?? ['#6366f1', '#8b5cf6', '#a78bfa'];
       await exportAsPPTX({ presentation, colors });
       toast.success('Downloaded as PowerPoint!');
     } catch (err: unknown) {
@@ -561,7 +561,7 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
 
   /* ── Slide Renderer ── */
 
-  const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors || COLOR_SCHEMES[0].colors;
+  const schemeColors = COLOR_SCHEMES.find(c => c.value === colorScheme)?.colors ?? COLOR_SCHEMES[0]?.colors ?? ['#6366f1', '#8b5cf6', '#a78bfa'];
   const gradientBg = isGradientSlide;
   const txtClass = (layout: string) => gradientBg(layout) ? 'text-white' : 'text-text-primary';
   const subtxtClass = (layout: string) => gradientBg(layout) ? 'text-white/70' : 'text-text-secondary';

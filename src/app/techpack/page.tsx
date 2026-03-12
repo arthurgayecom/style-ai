@@ -230,6 +230,32 @@ export default function TechPackPage() {
             </div>
           </div>
 
+          {/* Design Preview */}
+          {techPack.mockupImage && (
+            <div className="mb-6 rounded-2xl border border-border bg-bg-card p-5">
+              <h3 className="mb-3 text-xs font-bold text-text-muted uppercase tracking-wider">Design Preview</h3>
+              <div className="flex items-start gap-6">
+                <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={techPack.mockupImage} alt={techPack.garmentType} className="h-full w-full object-contain p-2" />
+                </div>
+                <div className="flex-1 space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><span className="text-text-muted">Style Name:</span> <span className="ml-1 font-bold text-text-primary">{techPack.styleName || garmentType}</span></div>
+                    <div><span className="text-text-muted">Style #:</span> <span className="ml-1 font-bold text-text-primary">{techPack.styleNumber || '—'}</span></div>
+                    <div><span className="text-text-muted">Fiber:</span> <span className="ml-1 font-medium text-text-primary">{techPack.fiberContent || '—'}</span></div>
+                    <div><span className="text-text-muted">Season:</span> <span className="ml-1 font-medium text-text-primary">{techPack.season || '—'}</span></div>
+                    <div><span className="text-text-muted">Sizes:</span> <span className="ml-1 font-medium text-text-primary">{techPack.sizes?.join(', ') || '—'}</span></div>
+                    <div><span className="text-text-muted">Origin:</span> <span className="ml-1 font-medium text-text-primary">{techPack.countryOfOrigin || 'TBD'}</span></div>
+                  </div>
+                  {techPack.additionalNotes && (
+                    <p className="text-text-muted italic border-t border-border pt-2 mt-2">{techPack.additionalNotes}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <div className="mb-4 flex gap-1 overflow-x-auto">
             {TABS.map(tab => (

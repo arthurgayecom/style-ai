@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const IMAGE_MODEL = 'gemini-2.0-flash-exp';
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 function getGeminiKeys(): string[] {
   const multi = process.env.FREE_GEMINI_API_KEYS;

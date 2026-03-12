@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseAIJSON } from '@/lib/ai/parseJSON';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const IMAGE_MODEL = 'gemini-2.0-flash-exp';
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
 const TEXT_MODEL = 'gemini-2.5-flash';
 
 function getGeminiKeys(): string[] {

@@ -77,13 +77,14 @@ export async function exportTechPackPdf(data: TechPackData): Promise<void> {
   labelValue('Country of Origin', data.countryOfOrigin || 'TBD', M + 90, y + 12);
   y += 26;
 
-  // Mockup image
+  // Mockup image — large, centered preview
   if (data.mockupImage) {
     try {
-      const imgW = 65;
-      const imgH = 65;
-      doc.addImage(data.mockupImage, 'PNG', M, y, imgW, imgH);
-      y += imgH + 4;
+      const imgW = 90;
+      const imgH = 90;
+      const imgX = (W - imgW) / 2;
+      doc.addImage(data.mockupImage, 'PNG', imgX, y, imgW, imgH);
+      y += imgH + 6;
     } catch { /* skip */ }
   }
 
