@@ -103,7 +103,7 @@ export default function BrandPage() {
             >
               <div className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-gray-800">
                 <Image
-                  src={design.image}
+                  src={`${design.image}?v=2`}
                   alt={design.garmentType}
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-105"

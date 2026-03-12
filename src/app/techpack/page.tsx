@@ -15,6 +15,8 @@ export default function TechPackPage() {
   const [error, setError] = useState('');
   const [techPack, setTechPack] = useState<TechPackData | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [visualizing, setVisualizing] = useState(false);
+  const [vizImage, setVizImage] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'measurements' | 'construction' | 'materials' | 'color' | 'labels' | 'packaging'>('measurements');
   const uploadRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +94,44 @@ export default function TechPackPage() {
       setError(err instanceof Error ? err.message : 'PDF export failed');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleVisualize = async () => {
+    if (!techPack) return;
+    setVisualizing(true);
+    setVizImage('');
+    try {
+      const specs = [
+        techPack.styleName || techPack.garmentType,
+        techPack.constructionDetails?.[0]?.stitchType,
+        techPack.constructionDetails?.[0]?.area,
+        techPack.colorway?.[0]?.name,
+        techPack.colorway?.[1]?.name,
+        techPack.materials?.[0]?.material,
+        techPack.materials?.[0]?.description,
+      ].filter(Boolean).join(', ');
+
+      const res = await fetch('/api/ai/mockup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'generate',
+          garmentType: techPack.garmentType || garmentType,
+          answers: [
+            { questionId: 'style', answer: techPack.styleName || garmentType },
+            { questionId: 'details', answer: `Generate from tech pack: ${specs}` },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Visualization failed');
+      if (data.mockupImage) setVizImage(data.mockupImage);
+      else throw new Error('No image generated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Visualization failed');
+    } finally {
+      setVisualizing(false);
     }
   };
 
@@ -219,6 +259,11 @@ export default function TechPackPage() {
               <p className="text-xs text-text-muted">Style #{techPack.styleNumber} | {techPack.season} | Base size: {techPack.baseSize}</p>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={handleVisualize} disabled={visualizing}
+                className="flex items-center gap-1.5 rounded-lg border border-purple-400/40 bg-purple-500/10 px-4 py-2 text-xs font-bold text-purple-400 disabled:opacity-50">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                {visualizing ? 'Generating...' : 'AI Visualize'}
+              </button>
               <button onClick={handleExportPdf} disabled={exporting}
                 className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-xs font-bold text-white shadow-md disabled:opacity-50">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -254,6 +299,38 @@ export default function TechPackPage() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* AI Visualization Preview */}
+          {(vizImage || visualizing) && (
+            <div className="mb-6 rounded-2xl border border-purple-400/30 bg-purple-500/5 p-5">
+              <h3 className="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                AI Visualization
+              </h3>
+              {visualizing ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex flex-col items-center gap-3">
+                    <svg className="h-8 w-8 animate-spin text-purple-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    <p className="text-sm text-purple-400 font-medium">Generating product visualization...</p>
+                  </div>
+                </div>
+              ) : vizImage ? (
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                  <div className="relative w-64 shrink-0 overflow-hidden rounded-xl border border-border bg-white shadow-lg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={vizImage} alt="AI Visualization" className="w-full object-contain" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-text-primary font-medium">AI-generated mockup based on your tech pack specifications.</p>
+                    <p className="text-xs text-text-muted">This visualization shows how the final product might look based on the materials, colors, and construction details defined in your tech pack.</p>
+                    <button onClick={handleVisualize} className="mt-2 rounded-lg border border-purple-400/40 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-500/10 transition-colors">
+                      Regenerate
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 

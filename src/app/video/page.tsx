@@ -31,6 +31,7 @@ export default function VideoPage() {
   const [currentSegment, setCurrentSegment] = useState(0);
   const [currentWord, setCurrentWord] = useState(0);
   const [speed, setSpeed] = useState(1);
+  const [language, setLanguage] = useState('en');
   const [brainrot, setBrainrot] = useState(false);
   const [selectedBg, setSelectedBg] = useState<Background>(BACKGROUNDS[0]);
   const [customUrl, setCustomUrl] = useState('');
@@ -55,13 +56,19 @@ export default function VideoPage() {
     return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
+  const availableLanguages = [...new Map(voices.map(v => {
+    const code = v.lang.split('-')[0];
+    const names: Record<string, string> = { en: 'English', fr: 'French', es: 'Spanish', de: 'German', pt: 'Portuguese', it: 'Italian', ja: 'Japanese', ko: 'Korean', zh: 'Chinese', ar: 'Arabic', hi: 'Hindi', ru: 'Russian', nl: 'Dutch', sv: 'Swedish', tr: 'Turkish' };
+    return [code, names[code] || code.toUpperCase()];
+  })).values()].sort();
+
   const getVoiceForSpeaker = useCallback((speaker: 'A' | 'B'): SpeechSynthesisVoice | undefined => {
-    const english = voices.filter(v => v.lang.startsWith('en'));
-    const pool = english.length >= 2 ? english : voices;
+    const langVoices = voices.filter(v => v.lang.startsWith(language));
+    const pool = langVoices.length >= 2 ? langVoices : voices.filter(v => v.lang.startsWith('en'));
     if (pool.length === 0) return undefined;
     if (speaker === 'A') return pool[0];
     return pool[1] || pool[0];
-  }, [voices]);
+  }, [voices, language]);
 
   const generateScript = async () => {
     if (!transcript.trim()) { toast.error('No transcript loaded. Go to Record page first.'); return; }
@@ -313,6 +320,19 @@ export default function VideoPage() {
                 >
                   {brainrot ? 'ON — Gameplay Background' : 'OFF — Clean View'}
                 </button>
+              </div>
+            </div>
+
+            {/* Language */}
+            <div className="col-span-2 mt-2">
+              <label className="mb-1 block text-sm font-medium text-text-primary">Voice Language</label>
+              <div className="flex flex-wrap gap-1">
+                {availableLanguages.map(([code, name]) => (
+                  <button key={code} onClick={() => setLanguage(code)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${language === code ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                    {name}
+                  </button>
+                ))}
               </div>
             </div>
 
