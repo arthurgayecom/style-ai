@@ -69,6 +69,9 @@ function parseImage(dataUrl: string) {
   return null;
 }
 
+// Allow up to 60s for image generation (default 10s causes timeout)
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -143,6 +146,7 @@ Generate questions to fully specify this ${garmentType} for manufacturing.`;
 // ═══════ MODE: GENERATE ═══════
 // Creates the actual mockup from references + answers + instructions
 async function handleGenerate(body: Record<string, unknown>) {
+  try {
   const { referenceImages, garmentType, answers, instructions } = body;
   const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
   const answerList = answers as Array<{ questionId: string; answer: string | string[] }> | undefined;
@@ -230,6 +234,10 @@ async function handleGenerate(body: Record<string, unknown>) {
   } catch { /* specs are optional */ }
 
   return NextResponse.json({ mockupImage, description, garmentType, specs });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Mockup generation failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 // ═══════ MODE: EDIT ═══════
