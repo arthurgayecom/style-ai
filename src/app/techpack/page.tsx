@@ -1,22 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GARMENT_TYPES } from '@/types/mockup';
 import type { TechPackData, MockupResult } from '@/types/mockup';
-import { getItem } from '@/lib/storage/localStorage';
+import { getItem, removeItem } from '@/lib/storage/localStorage';
 
 export default function TechPackPage() {
   const [garmentType, setGarmentType] = useState('T-Shirt');
   const [description, setDescription] = useState('');
   const [selectedMockup, setSelectedMockup] = useState<MockupResult | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<string>('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [techPack, setTechPack] = useState<TechPackData | null>(null);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'measurements' | 'construction' | 'materials' | 'color' | 'labels' | 'packaging'>('measurements');
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   const mockupHistory: MockupResult[] = getItem('mockup_history', []);
+
+  // Auto-load design from Design Studio if available
+  useEffect(() => {
+    const fromDesign = getItem<MockupResult | null>('techpack_from_design', null);
+    if (fromDesign) {
+      setSelectedMockup(fromDesign);
+      setGarmentType(fromDesign.garmentType || 'T-Shirt');
+      if (fromDesign.description) setDescription(fromDesign.description);
+      removeItem('techpack_from_design');
+    }
+  }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setError('Please upload an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('File too large (max 5MB)'); return; }
+    setError('');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setUploadedImage(dataUrl);
+      setSelectedMockup(null); // deselect history items
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -24,13 +52,15 @@ export default function TechPackPage() {
     setTechPack(null);
 
     try {
+      const mockupImage = selectedMockup?.mockupImage || uploadedImage || undefined;
+
       const res = await fetch('/api/ai/techpack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           garmentType,
           description,
-          mockupImage: selectedMockup?.mockupImage || undefined,
+          mockupImage,
           specs: selectedMockup?.specs || undefined,
         }),
       });
@@ -40,7 +70,7 @@ export default function TechPackPage() {
 
       setTechPack({
         ...data.techPack,
-        mockupImage: selectedMockup?.mockupImage || '',
+        mockupImage: mockupImage || '',
         garmentType,
         date: new Date().toISOString(),
       });
@@ -106,25 +136,62 @@ export default function TechPackPage() {
                 className="w-full resize-none rounded-lg border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/40 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400/30" />
             </div>
 
-            {mockupHistory.length > 0 && (
-              <div>
-                <label className="mb-2 block text-xs font-semibold text-text-secondary">From Your Designs</label>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {mockupHistory.filter(m => m.mockupImage).slice(0, 8).map(m => (
-                    <button key={m.id}
-                      onClick={() => setSelectedMockup(selectedMockup?.id === m.id ? null : m)}
-                      className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${selectedMockup?.id === m.id ? 'border-purple-400 ring-2 ring-purple-400/30' : 'border-border hover:border-purple-400/50'}`}>
-                      <img src={m.mockupImage} alt={m.garmentType} className="h-full w-full object-cover" />
-                      {selectedMockup?.id === m.id && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-purple-500/20">
-                          <svg className="h-4 w-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+            {/* Source: Design Studio history or upload */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-text-secondary">Design Source</label>
+
+              {/* From Design Studio */}
+              {mockupHistory.filter(m => m.mockupImage).length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-wider font-semibold">From Design Studio</p>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {mockupHistory.filter(m => m.mockupImage).slice(0, 8).map(m => (
+                      <button key={m.id}
+                        onClick={() => { setSelectedMockup(selectedMockup?.id === m.id ? null : m); setUploadedImage(''); }}
+                        className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${selectedMockup?.id === m.id ? 'border-purple-400 ring-2 ring-purple-400/30' : 'border-border hover:border-purple-400/50'}`}>
+                        <img src={m.mockupImage} alt={m.garmentType} className="h-full w-full object-cover" />
+                        {selectedMockup?.id === m.id && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-purple-500/20">
+                            <svg className="h-4 w-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {/* Upload image directly */}
+              <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-wider font-semibold">Or Upload Image</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => uploadRef.current?.click()}
+                  className={`flex items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-xs transition-all ${
+                    uploadedImage
+                      ? 'border-green-500/40 bg-green-500/5 text-green-400'
+                      : 'border-border text-text-muted hover:border-purple-400/50 hover:bg-purple-500/5'
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {uploadedImage ? 'Image uploaded' : 'Upload a design image'}
+                </button>
+                <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+
+                {uploadedImage && (
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-green-500/30">
+                    <img src={uploadedImage} alt="Uploaded" className="h-full w-full object-cover" />
+                    <button
+                      onClick={() => setUploadedImage('')}
+                      className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5"
+                    >
+                      <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <button onClick={handleGenerate} disabled={generating}
