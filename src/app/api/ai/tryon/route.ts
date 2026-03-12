@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+const TEXT_MODEL = 'gemini-2.5-flash';
+const AIRFORCE_API_URL = 'https://api.airforce/v1/images/generations';
+const TOGETHER_API_URL = 'https://api.together.xyz/v1/images/generations';
 
 function getGeminiKeys(): string[] {
   const multi = process.env.FREE_GEMINI_API_KEYS;
@@ -15,111 +17,158 @@ let keyIndex = 0;
 
 export const maxDuration = 60;
 
+async function callGemini(contents: unknown[], systemInstruction?: string) {
+  const keys = getGeminiKeys();
+  if (keys.length === 0) throw new Error('No AI keys configured.');
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: { maxOutputTokens: 4096 },
+  };
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+  const bodyStr = JSON.stringify(body);
+
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (keyIndex + i) % keys.length;
+    const apiKey = keys[idx];
+    const res = await fetch(
+      `${GEMINI_BASE}/${TEXT_MODEL}:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: bodyStr }
+    );
+    if (res.ok) { keyIndex = idx + 1; return res.json(); }
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.error?.message || '';
+    const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+    if (isQuota && i < keys.length - 1) continue;
+    throw new Error(msg || `AI error (${res.status})`);
+  }
+  throw new Error('All AI keys are rate-limited.');
+}
+
+// ── Generate image via free API (airforce) with Together.ai fallback ──
+async function generateImage(prompt: string, width = 768, height = 1024): Promise<string> {
+  // Try free airforce API first (no key needed, FLUX models)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1000 + attempt * 1000));
+
+      const res = await fetch(AIRFORCE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'flux-2-klein-4b',
+          prompt,
+          size: `${width}x${height}`,
+          n: 1,
+        }),
+      });
+
+      if (res.status === 429) continue;
+
+      if (res.ok) {
+        const data = await res.json();
+        const imageUrl = data?.data?.[0]?.url;
+        const b64 = data?.data?.[0]?.b64_json;
+
+        if (b64) return `data:image/png;base64,${b64}`;
+
+        if (imageUrl) {
+          const imgRes = await fetch(imageUrl);
+          if (imgRes.ok) {
+            const buffer = await imgRes.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+            return `data:${contentType};base64,${base64}`;
+          }
+        }
+      }
+    } catch {
+      // Network error, try next attempt
+    }
+  }
+
+  // Fallback to Together.ai if key is available
+  const togetherKey = process.env.TOGETHER_API_KEY;
+  if (togetherKey) {
+    const res = await fetch(TOGETHER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${togetherKey}`,
+      },
+      body: JSON.stringify({
+        model: 'black-forest-labs/FLUX.1-schnell-Free',
+        prompt,
+        width,
+        height,
+        steps: 4,
+        n: 1,
+        response_format: 'b64_json',
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (b64) return `data:image/png;base64,${b64}`;
+    }
+  }
+
+  throw new Error('Image generation is temporarily unavailable. Please try again in a moment.');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userPhoto, garmentImage, measurements } = body;
-
-    if (!userPhoto || !garmentImage) {
-      return NextResponse.json({ error: 'Both a photo of yourself and a garment image are required' }, { status: 400 });
-    }
+    const { garmentDescription, measurements } = body;
 
     // Check for Replicate API token (premium try-on)
     const replicateToken = process.env.REPLICATE_API_TOKEN;
     if (replicateToken) {
+      const { userPhoto, garmentImage } = body;
+      if (!userPhoto || !garmentImage) {
+        return NextResponse.json({ error: 'Both a photo and garment image are required for Replicate try-on' }, { status: 400 });
+      }
       return handleReplicateTryOn(userPhoto, garmentImage, replicateToken);
     }
 
-    // Fall back to Gemini image generation
-    const keys = getGeminiKeys();
-    if (keys.length === 0) {
-      return NextResponse.json({ error: 'No AI keys configured.' }, { status: 503 });
-    }
-
-    // Build prompt
+    // Free tier: use Gemini for prompt + FLUX for image
     const measurementText = measurements
-      ? `The person's measurements: ${Object.entries(measurements).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')}.`
+      ? `Person's measurements: ${Object.entries(measurements).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')}.`
       : '';
 
-    const prompt = [
-      `You are a professional fashion visualization expert.`,
-      `I'm providing two images: (1) a photo of a person and (2) a garment/clothing item.`,
-      `Generate a realistic image of the person wearing this garment.`,
-      `Maintain the person's exact pose, body proportions, face, and background.`,
-      `The garment should look naturally worn — with realistic draping, folds, and fit.`,
-      measurementText,
-      `Make it look like a real photo, not a composite or collage.`,
-    ].filter(Boolean).join(' ');
+    const systemPrompt = `You are creating a virtual try-on visualization. Create a detailed image prompt for generating a realistic photo of a person wearing the described garment.
 
-    // Parse both images
-    const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+The image should show: a fit male model wearing the garment in a casual standing pose, full body shot, natural lighting, clean background. Make the clothing look realistically worn with natural draping and folds.
+${measurementText}
 
-    for (const img of [userPhoto, garmentImage]) {
-      const match = img.match(/^data:(image\/\w+);base64,(.+)$/);
-      if (match) {
-        contentParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-      }
-    }
-    contentParts.push({ text: prompt });
+Return ONLY valid JSON: {"imagePrompt":"...","description":"..."}`;
 
-    const requestBody = {
-      contents: [{ role: 'user', parts: contentParts }],
-      generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'],
-        maxOutputTokens: 4096,
-      },
-    };
+    const desc = garmentDescription || body.garmentType || 'clothing item';
 
-    const bodyStr = JSON.stringify(requestBody);
+    const data = await callGemini([{
+      role: 'user',
+      parts: [{ text: `Generate a try-on image prompt for: ${desc}` }],
+    }], systemPrompt);
 
-    for (let i = 0; i < keys.length; i++) {
-      const idx = (keyIndex + i) % keys.length;
-      const apiKey = keys[idx];
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let imagePrompt = '';
+    let description = '';
 
-      const res = await fetch(
-        `${GEMINI_BASE}/${IMAGE_MODEL}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: bodyStr,
-        }
-      );
-
-      if (res.ok) {
-        keyIndex = idx + 1;
-        const data = await res.json();
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-
-        let description = '';
-        let resultImage = '';
-
-        for (const part of parts) {
-          if (part.text) description += part.text;
-          if (part.inlineData) {
-            resultImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          }
-        }
-
-        if (!resultImage) {
-          return NextResponse.json(
-            { error: 'AI could not generate a try-on image. Try different photos or angles.' },
-            { status: 500 }
-          );
-        }
-
-        return NextResponse.json({ resultImage, description, source: 'gemini' });
-      }
-
-      const err = await res.json().catch(() => ({}));
-      const msg = err?.error?.message || '';
-      const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
-
-      if (isQuota && i < keys.length - 1) continue;
-
-      return NextResponse.json({ error: msg || `AI error (${res.status})` }, { status: res.status });
+    try {
+      const parsed = JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      imagePrompt = parsed.imagePrompt || '';
+      description = parsed.description || '';
+    } catch {
+      imagePrompt = `Male model wearing ${desc}, full body standing pose, natural lighting, clean white background, realistic fashion photography`;
+      description = `Virtual try-on: ${desc}`;
     }
 
-    return NextResponse.json({ error: 'All AI keys are rate-limited. Try again in a minute.' }, { status: 429 });
+    const resultImage = await generateImage(imagePrompt);
+
+    return NextResponse.json({ resultImage, description, source: 'flux' });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Try-on failed';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseAIJSON } from '@/lib/ai/parseJSON';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
 const TEXT_MODEL = 'gemini-2.5-flash';
+const AIRFORCE_API_URL = 'https://api.airforce/v1/images/generations';
+const TOGETHER_API_URL = 'https://api.together.xyz/v1/images/generations';
 
 function getGeminiKeys(): string[] {
   const multi = process.env.FREE_GEMINI_API_KEYS;
@@ -15,19 +16,17 @@ function getGeminiKeys(): string[] {
 
 let keyIndex = 0;
 
-// ── Shared: call Gemini with key rotation ──
+// ── Call Gemini text model with key rotation ──
 async function callGemini(
-  model: string,
   contents: unknown[],
   systemInstruction?: string,
-  generationConfig?: Record<string, unknown>,
 ) {
   const keys = getGeminiKeys();
   if (keys.length === 0) throw new Error('No AI keys configured. Add Gemini API keys in Settings.');
 
   const body: Record<string, unknown> = {
     contents,
-    generationConfig: { maxOutputTokens: 8192, ...generationConfig },
+    generationConfig: { maxOutputTokens: 8192 },
   };
   if (systemInstruction) {
     body.systemInstruction = { parts: [{ text: systemInstruction }] };
@@ -39,7 +38,7 @@ async function callGemini(
     const apiKey = keys[idx];
 
     const res = await fetch(
-      `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`,
+      `${GEMINI_BASE}/${TEXT_MODEL}:generateContent?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: bodyStr }
     );
 
@@ -50,14 +49,84 @@ async function callGemini(
 
     const err = await res.json().catch(() => ({}));
     const msg = err?.error?.message || '';
-    if (msg.toLowerCase().includes('not available in your country')) {
-      throw new Error('Image generation is not available in your region. The app works on Vercel (US servers).');
-    }
     const isQuota = res.status === 429 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
     if (isQuota && i < keys.length - 1) continue;
     throw new Error(msg || `AI error (${res.status})`);
   }
   throw new Error('All AI keys are rate-limited. Try again in a minute.');
+}
+
+// ── Generate image via free API (airforce) with Together.ai fallback ──
+async function generateImage(prompt: string, width = 1024, height = 1024): Promise<string> {
+  // Try free airforce API first (no key needed, FLUX models)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1000 + attempt * 1000));
+
+      const res = await fetch(AIRFORCE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'flux-2-klein-4b',
+          prompt,
+          size: `${width}x${height}`,
+          n: 1,
+        }),
+      });
+
+      if (res.status === 429) continue; // rate limited, retry
+
+      if (res.ok) {
+        const data = await res.json();
+        const imageUrl = data?.data?.[0]?.url;
+        const b64 = data?.data?.[0]?.b64_json;
+
+        if (b64) return `data:image/png;base64,${b64}`;
+
+        if (imageUrl) {
+          // Fetch image from URL and convert to base64
+          const imgRes = await fetch(imageUrl);
+          if (imgRes.ok) {
+            const buffer = await imgRes.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+            return `data:${contentType};base64,${base64}`;
+          }
+        }
+      }
+    } catch {
+      // Network error, try next attempt
+    }
+  }
+
+  // Fallback to Together.ai if key is available
+  const togetherKey = process.env.TOGETHER_API_KEY;
+  if (togetherKey) {
+    const res = await fetch(TOGETHER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${togetherKey}`,
+      },
+      body: JSON.stringify({
+        model: 'black-forest-labs/FLUX.1-schnell-Free',
+        prompt,
+        width,
+        height,
+        steps: 4,
+        n: 1,
+        response_format: 'b64_json',
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (b64) return `data:image/png;base64,${b64}`;
+    }
+  }
+
+  throw new Error('Image generation is temporarily unavailable. Please try again in a moment.');
 }
 
 // ── Parse base64 image from data URL ──
@@ -67,7 +136,7 @@ function parseImage(dataUrl: string) {
   return null;
 }
 
-// Allow up to 60s for image generation (default 10s causes timeout)
+// Allow up to 60s for image generation
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
@@ -87,7 +156,6 @@ export async function POST(req: NextRequest) {
 }
 
 // ═══════ MODE: QUESTIONS ═══════
-// Analyzes reference images + part selections and generates smart questions
 async function handleQuestions(body: Record<string, unknown>) {
   const { garmentType, partsSummary, referenceImages } = body;
   const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
@@ -120,7 +188,6 @@ Rules:
 ${partsSummary ? `Parts selected from references: ${partsSummary}` : 'No specific parts selected — ask about general design preferences.'}
 Generate questions to fully specify this ${garmentType} for manufacturing.`;
 
-  // Build content with images
   const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
   if (refs) {
     for (const ref of refs.slice(0, 4)) {
@@ -130,7 +197,7 @@ Generate questions to fully specify this ${garmentType} for manufacturing.`;
   }
   contentParts.push({ text: userPrompt });
 
-  const data = await callGemini(TEXT_MODEL, [{ role: 'user', parts: contentParts }], systemPrompt);
+  const data = await callGemini([{ role: 'user', parts: contentParts }], systemPrompt);
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
   try {
@@ -142,96 +209,76 @@ Generate questions to fully specify this ${garmentType} for manufacturing.`;
 }
 
 // ═══════ MODE: GENERATE ═══════
-// Creates the actual mockup from references + answers + instructions
+// Step 1: Gemini creates a detailed image prompt from user inputs
+// Step 2: FLUX generates the actual image (free via airforce API)
 async function handleGenerate(body: Record<string, unknown>) {
   try {
-  const { referenceImages, garmentType, answers, instructions } = body;
-  const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
-  const answerList = answers as Array<{ questionId: string; answer: string | string[] }> | undefined;
+    const { referenceImages, garmentType, answers, instructions } = body;
+    const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
+    const answerList = answers as Array<{ questionId: string; answer: string | string[] }> | undefined;
 
-  // Build detailed prompt from all inputs
-  const promptLines: string[] = [
-    `You are a professional fashion designer creating a production-ready flat-lay mockup.`,
-    ``,
-    `GARMENT: ${garmentType}`,
-  ];
+    // Build context for Gemini
+    const contextLines: string[] = [`Garment: ${garmentType}`];
 
-  // Part annotations
-  if (refs?.some(r => r.parts?.length > 0)) {
-    promptLines.push(``, `PART SELECTION FROM REFERENCE IMAGES:`);
-    refs.forEach((r, i) => {
-      if (r.parts?.length > 0) {
-        promptLines.push(`- Image ${i + 1}: Take the ${r.parts.join(', ')}${r.notes ? ` (${r.notes})` : ''}`);
-      } else if (r.notes) {
-        promptLines.push(`- Image ${i + 1}: ${r.notes}`);
+    if (refs?.some(r => r.parts?.length > 0)) {
+      contextLines.push(`Parts from reference images:`);
+      refs.forEach((r, i) => {
+        if (r.parts?.length > 0) contextLines.push(`- Image ${i + 1}: ${r.parts.join(', ')}${r.notes ? ` (${r.notes})` : ''}`);
+        else if (r.notes) contextLines.push(`- Image ${i + 1}: ${r.notes}`);
+      });
+    }
+
+    if (answerList?.some(a => a.answer && (typeof a.answer === 'string' ? a.answer.trim() : a.answer.length > 0))) {
+      contextLines.push(`Design specs:`);
+      for (const a of answerList) {
+        if (!a.answer || (typeof a.answer === 'string' && !a.answer.trim()) || (Array.isArray(a.answer) && a.answer.length === 0)) continue;
+        const val = Array.isArray(a.answer) ? a.answer.join(', ') : a.answer;
+        contextLines.push(`- ${a.questionId}: ${val}`);
       }
-    });
-    promptLines.push(`Combine these elements into ONE cohesive design.`);
-  }
-
-  // Q&A answers
-  if (answerList?.some(a => a.answer && (typeof a.answer === 'string' ? a.answer.trim() : a.answer.length > 0))) {
-    promptLines.push(``, `DESIGN SPECIFICATIONS FROM CUSTOMER:`);
-    for (const a of answerList) {
-      if (!a.answer || (typeof a.answer === 'string' && !a.answer.trim()) || (Array.isArray(a.answer) && a.answer.length === 0)) continue;
-      const val = Array.isArray(a.answer) ? a.answer.join(', ') : a.answer;
-      promptLines.push(`- ${a.questionId}: ${val}`);
     }
-  }
 
-  if (instructions) promptLines.push(``, `ADDITIONAL INSTRUCTIONS: ${instructions}`);
+    if (instructions) contextLines.push(`Additional: ${instructions}`);
 
-  promptLines.push(
-    ``,
-    `OUTPUT REQUIREMENTS:`,
-    `- Generate a clean, high-quality flat-lay mockup on a white/light background`,
-    `- Show the garment with precise proportions and realistic fabric texture`,
-    `- Include visible construction details (seams, stitching, hardware)`,
-    `- Make it look production-ready — like something you'd send to a factory`,
-    `- The mockup should be a SINGLE cohesive design incorporating all the specified elements`,
-  );
+    // Step 1: Ask Gemini to create the perfect image generation prompt + description
+    const systemPrompt = `You are a fashion design AI. Given the garment details below, create TWO things:
 
-  const prompt = promptLines.join('\n');
+1. "imagePrompt" — A detailed, vivid prompt for an AI image generator to create a professional flat-lay mockup photo. Be very specific about: garment type, exact colors, fabric texture, fit/silhouette, all design details (waistband, cuffs, seams, prints, patterns), and styling. End with: "Professional flat-lay product photo on clean white background, studio lighting, high detail, fashion e-commerce style."
 
-  // Build content parts with images
-  const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-  if (refs) {
-    for (const ref of refs.slice(0, 6)) {
-      const img = parseImage(ref.dataUrl);
-      if (img) contentParts.push({ inlineData: img });
-    }
-  }
-  contentParts.push({ text: prompt });
+2. "description" — A fashion-industry description of the garment (2-3 sentences).
 
-  const data = await callGemini(IMAGE_MODEL, [{ role: 'user', parts: contentParts }], undefined, {
-    responseModalities: ['TEXT', 'IMAGE'],
-    maxOutputTokens: 4096,
-  });
+3. "specs" — Quick specs as JSON: {"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}
 
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  let description = '';
-  let mockupImage = '';
-  for (const part of parts) {
-    if (part.text) description += part.text;
-    if (part.inlineData) mockupImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-  }
+Return ONLY valid JSON (no markdown):
+{"imagePrompt":"...","description":"...","specs":{...}}`;
 
-  if (!mockupImage && !description) {
-    return NextResponse.json({ error: 'AI did not generate a design. Try different references or instructions.' }, { status: 500 });
-  }
-
-  // Also generate quick specs via text model
-  let specs = null;
-  try {
-    const specsData = await callGemini(TEXT_MODEL, [{
+    const data = await callGemini([{
       role: 'user',
-      parts: [{ text: `Based on this design description, extract quick specs. Return ONLY JSON:\n{"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}\n\nDesign: ${garmentType}. ${description}. ${promptLines.slice(3).join(' ')}` }],
-    }]);
-    const specsText = specsData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    specs = parseAIJSON(specsText);
-  } catch { /* specs are optional */ }
+      parts: [{ text: contextLines.join('\n') }],
+    }], systemPrompt);
 
-  return NextResponse.json({ mockupImage, description, garmentType, specs });
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let imagePrompt = '';
+    let description = '';
+    let specs = null;
+
+    try {
+      const parsed = parseAIJSON(text) as { imagePrompt?: string; description?: string; specs?: unknown };
+      imagePrompt = parsed.imagePrompt || '';
+      description = parsed.description || '';
+      specs = parsed.specs || null;
+    } catch {
+      imagePrompt = `Professional flat-lay mockup of ${garmentType}. ${instructions || ''}. Clean white background, studio lighting, fashion e-commerce photo.`;
+      description = text || `${garmentType} design`;
+    }
+
+    if (!imagePrompt) {
+      imagePrompt = `Professional flat-lay mockup of ${garmentType}. ${instructions || ''}. Clean white background, studio lighting, high detail, fashion product photo.`;
+    }
+
+    // Step 2: Generate the image via FLUX
+    const mockupImage = await generateImage(imagePrompt);
+
+    return NextResponse.json({ mockupImage, description, garmentType, specs });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Mockup generation failed';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -239,60 +286,49 @@ async function handleGenerate(body: Record<string, unknown>) {
 }
 
 // ═══════ MODE: EDIT ═══════
-// Takes an existing mockup and applies changes
 async function handleEdit(body: Record<string, unknown>) {
-  const { mockupImage, editInstructions, garmentType } = body;
-
-  if (!mockupImage || !editInstructions) {
-    return NextResponse.json({ error: 'Both a mockup image and edit instructions are required.' }, { status: 400 });
-  }
-
-  const prompt = [
-    `You are editing an existing clothing design mockup.`,
-    ``,
-    `GARMENT TYPE: ${garmentType}`,
-    `EDIT REQUEST: ${editInstructions}`,
-    ``,
-    `Apply ONLY the requested changes to this garment design.`,
-    `Keep everything else the same — same style, same background, same perspective.`,
-    `Generate the updated mockup as a clean flat-lay image.`,
-  ].join('\n');
-
-  const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-  const img = parseImage(mockupImage as string);
-  if (img) contentParts.push({ inlineData: img });
-  contentParts.push({ text: prompt });
-
-  const data = await callGemini(IMAGE_MODEL, [{ role: 'user', parts: contentParts }], undefined, {
-    responseModalities: ['TEXT', 'IMAGE'],
-    maxOutputTokens: 4096,
-  });
-
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  let description = '';
-  let editedImage = '';
-  for (const part of parts) {
-    if (part.text) description += part.text;
-    if (part.inlineData) editedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-  }
-
-  // Generate updated specs
-  let specs = null;
   try {
-    const specsData = await callGemini(TEXT_MODEL, [{
-      role: 'user',
-      parts: [{ text: `Extract quick specs from this design edit. Return ONLY JSON:\n{"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}\n\nGarment: ${garmentType}. Edit: ${editInstructions}. ${description}` }],
-    }]);
-    const specsText = specsData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    specs = parseAIJSON(specsText);
-  } catch { /* optional */ }
+    const { editInstructions, garmentType, description: prevDesc } = body;
 
-  return NextResponse.json({
-    mockupImage: editedImage || mockupImage,
-    description: description || `Applied: ${editInstructions}`,
-    garmentType,
-    specs,
-  });
+    if (!editInstructions) {
+      return NextResponse.json({ error: 'Edit instructions are required.' }, { status: 400 });
+    }
+
+    const systemPrompt = `You are editing an existing ${garmentType} design. The previous design was: "${prevDesc || 'no description'}".
+The user wants to: "${editInstructions}".
+
+Create an updated image generation prompt incorporating these changes. Return ONLY valid JSON:
+{"imagePrompt":"...","description":"...","specs":{...}}
+
+The imagePrompt should describe the FULL updated garment (not just the changes). End with: "Professional flat-lay product photo on clean white background, studio lighting, high detail, fashion e-commerce style."`;
+
+    const data = await callGemini([{
+      role: 'user',
+      parts: [{ text: `Edit request: ${editInstructions}` }],
+    }], systemPrompt);
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let imagePrompt = '';
+    let description = '';
+    let specs = null;
+
+    try {
+      const parsed = parseAIJSON(text) as { imagePrompt?: string; description?: string; specs?: unknown };
+      imagePrompt = parsed.imagePrompt || '';
+      description = parsed.description || `Applied: ${editInstructions}`;
+      specs = parsed.specs || null;
+    } catch {
+      imagePrompt = `Professional flat-lay mockup of ${garmentType}. ${editInstructions}. Clean white background, studio lighting, fashion e-commerce photo.`;
+      description = `Applied: ${editInstructions}`;
+    }
+
+    const mockupImage = await generateImage(imagePrompt);
+
+    return NextResponse.json({ mockupImage, description, garmentType, specs });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Edit failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 // ── Fallback questions if AI fails ──
