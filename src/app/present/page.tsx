@@ -557,7 +557,7 @@ html{scroll-snap-type:y mandatory;overflow-y:scroll}
     setExporting(false);
   };
 
-  const slide = presentation?.slides[currentSlide];
+  const slide = presentation?.slides?.[currentSlide];
 
   /* ── Slide Renderer ── */
 

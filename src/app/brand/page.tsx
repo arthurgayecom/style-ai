@@ -17,12 +17,13 @@ export default function BrandPage() {
   const [designs, setDesigns] = useState<BrandDesign[]>([]);
   const [selected, setSelected] = useState<BrandDesign | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     fetch('/brand/collection.json')
-      .then(r => r.json())
-      .then(data => setDesigns(data))
-      .catch(() => setDesigns([]));
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => { setDesigns(data); setLoadError(false); })
+      .catch(() => { setDesigns([]); setLoadError(true); });
   }, []);
 
   const categories = [
@@ -81,9 +82,9 @@ export default function BrandPage() {
       {/* Design Grid */}
       {designs.length === 0 ? (
         <div className="rounded-xl border border-border bg-bg-card p-12 text-center">
-          <p className="text-lg font-semibold text-text-primary">Collection Loading...</p>
+          <p className="text-lg font-semibold text-text-primary">{loadError ? 'Failed to Load Collection' : 'Collection Loading...'}</p>
           <p className="mt-2 text-sm text-text-muted">
-            Designs are being generated. Refresh in a moment.
+            {loadError ? 'Could not load the collection. Please refresh the page.' : 'Designs are being generated. Refresh in a moment.'}
           </p>
         </div>
       ) : (

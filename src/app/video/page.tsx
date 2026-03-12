@@ -58,6 +58,7 @@ export default function VideoPage() {
   const getVoiceForSpeaker = useCallback((speaker: 'A' | 'B'): SpeechSynthesisVoice | undefined => {
     const english = voices.filter(v => v.lang.startsWith('en'));
     const pool = english.length >= 2 ? english : voices;
+    if (pool.length === 0) return undefined;
     if (speaker === 'A') return pool[0];
     return pool[1] || pool[0];
   }, [voices]);

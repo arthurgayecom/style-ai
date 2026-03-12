@@ -59,6 +59,7 @@ export async function exportAsPPTX({
   for (const s of presentation.slides) {
     const slide = pptx.addSlide();
     const isGradient = GRADIENT_LAYOUTS.has(s.layout);
+    const bullets = s.bullets || [];
 
     if (isGradient) {
       slide.background = { color: c1 };
@@ -72,8 +73,8 @@ export async function exportAsPPTX({
       case 'title':
         slide.background = { color: c1 };
         slide.addText(s.title, { x: 0.8, y: 1.5, w: 11.5, h: 2, fontSize: 44, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center' });
-        if (s.bullets[0]) {
-          slide.addText(s.bullets[0], { x: 0.8, y: 3.8, w: 11.5, h: 1, fontSize: 20, fontFace: 'Arial', color: 'FFFFFF', align: 'center', transparency: 30 });
+        if (bullets[0]) {
+          slide.addText(bullets[0], { x: 0.8, y: 3.8, w: 11.5, h: 1, fontSize: 20, fontFace: 'Arial', color: 'FFFFFF', align: 'center', transparency: 30 });
         }
         break;
 
@@ -82,7 +83,7 @@ export async function exportAsPPTX({
         if (s.title) {
           slide.addText(s.title, { x: 0.8, y: 1.2, w: 11.5, h: 0.6, fontSize: 12, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center', transparency: 50 });
         }
-        slide.addText(s.statement || s.bullets[0] || '', {
+        slide.addText(s.statement || bullets[0] || '', {
           x: 1, y: 2, w: 11, h: 3.5, fontSize: 40, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center', valign: 'middle',
         });
         break;
@@ -92,8 +93,8 @@ export async function exportAsPPTX({
         slide.addText(s.statement || s.title, {
           x: 1, y: 2, w: 11, h: 3, fontSize: 44, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center', valign: 'middle',
         });
-        if (s.bullets[0]) {
-          slide.addText(s.bullets[0], { x: 1, y: 5.2, w: 11, h: 0.8, fontSize: 18, fontFace: 'Arial', color: 'FFFFFF', align: 'center', transparency: 40 });
+        if (bullets[0]) {
+          slide.addText(bullets[0], { x: 1, y: 5.2, w: 11, h: 0.8, fontSize: 18, fontFace: 'Arial', color: 'FFFFFF', align: 'center', transparency: 40 });
         }
         break;
 
@@ -111,7 +112,7 @@ export async function exportAsPPTX({
         slide.addShape(pptx.ShapeType.roundRect, {
           x: 3, y: 2, w: 7, h: 3, fill: { color: c3, transparency: 70 }, rectRadius: 0.3,
         });
-        slide.addText(s.highlightValue || s.bullets[0] || '', {
+        slide.addText(s.highlightValue || bullets[0] || '', {
           x: 3, y: 2.2, w: 7, h: 2, fontSize: 48, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center', valign: 'middle',
         });
         if (s.highlightLabel) {
@@ -121,8 +122,8 @@ export async function exportAsPPTX({
 
       case 'content':
         slide.addText(s.title, { x: 0.8, y: 0.5, w: 11.5, h: 1, fontSize: 28, fontFace: 'Arial', bold: true, color: '333333' });
-        if (s.bullets.length > 0) {
-          const bulletText = s.bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
+        if (bullets.length > 0) {
+          const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
           slide.addText(bulletText, { x: 0.8, y: 1.8, w: s.imageDescription ? 7 : 11.5, h: 5, fontFace: 'Arial', valign: 'top' });
         }
         if (s.imageUrl) {
@@ -139,8 +140,8 @@ export async function exportAsPPTX({
             slide.addImage({ path: s.imageUrl, x: 0.8, y: 1.8, w: 5.5, h: 4.5, rounding: true });
           } catch { /* skip */ }
         }
-        if (s.bullets.length > 0) {
-          const bulletText = s.bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
+        if (bullets.length > 0) {
+          const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
           slide.addText(bulletText, { x: 7, y: 1.8, w: 5.5, h: 5, fontFace: 'Arial', valign: 'top' });
         }
         break;
@@ -148,8 +149,8 @@ export async function exportAsPPTX({
       case 'split_image':
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 6.5, h: 7.5, fill: { color: c1 } });
         slide.addText(s.title, { x: 0.5, y: 1, w: 5.5, h: 1, fontSize: 24, fontFace: 'Arial', bold: true, color: 'FFFFFF' });
-        if (s.bullets.length > 0) {
-          const bulletText = s.bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 14, color: 'FFFFFF', breakLine: true } }));
+        if (bullets.length > 0) {
+          const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 14, color: 'FFFFFF', breakLine: true } }));
           slide.addText(bulletText, { x: 0.5, y: 2.2, w: 5.5, h: 4.5, fontFace: 'Arial', valign: 'top' });
         }
         if (s.imageUrl) {
@@ -313,15 +314,15 @@ export async function exportAsPPTX({
           fill: { color: '000000', transparency: 40 },
         });
         slide.addText(s.title, { x: 0.8, y: 4.5, w: 11, h: 1.2, fontSize: 32, fontFace: 'Arial', bold: true, color: 'FFFFFF' });
-        if (s.overlayText || s.bullets[0]) {
-          slide.addText(s.overlayText || s.bullets[0], { x: 0.8, y: 5.7, w: 11, h: 0.8, fontSize: 16, fontFace: 'Arial', color: 'FFFFFF', transparency: 30 });
+        if (s.overlayText || bullets[0]) {
+          slide.addText(s.overlayText || bullets[0], { x: 0.8, y: 5.7, w: 11, h: 0.8, fontSize: 16, fontFace: 'Arial', color: 'FFFFFF', transparency: 30 });
         }
         break;
 
       default:
         slide.addText(s.title, { x: 0.8, y: 0.5, w: 11.5, h: 1, fontSize: 28, fontFace: 'Arial', bold: true, color: '333333' });
-        if (s.bullets.length > 0) {
-          const bulletText = s.bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
+        if (bullets.length > 0) {
+          const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
           slide.addText(bulletText, { x: 0.8, y: 1.8, w: 11.5, h: 5, fontFace: 'Arial', valign: 'top' });
         }
         break;

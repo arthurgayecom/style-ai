@@ -89,7 +89,7 @@ export default function DashboardPage() {
       <div className="mb-8">
         <h1 className="mb-1 text-3xl font-bold gradient-text inline-block">Dashboard</h1>
         <p className="text-text-secondary mt-1">
-          {activeProvider ? `Connected to ${PROVIDERS[activeProvider].name}` : 'No AI provider connected — '}
+          {activeProvider && PROVIDERS[activeProvider] ? `Connected to ${PROVIDERS[activeProvider].name}` : 'No AI provider connected — '}
           {!activeProvider && <Link href="/setup" className="text-accent hover:underline">set one up</Link>}
           {hasProfile && ` | ${confidence}% style confidence`}
         </p>

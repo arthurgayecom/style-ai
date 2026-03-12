@@ -32,6 +32,13 @@ function checkRateLimit(clientId: string): { allowed: boolean; remaining: number
   const today = new Date().toISOString().split('T')[0];
   const usage = usageMap.get(clientId);
 
+  // Clean up stale entries from previous days (prevent memory leak)
+  if (usageMap.size > 1000) {
+    for (const [key, val] of usageMap) {
+      if (val.date !== today) usageMap.delete(key);
+    }
+  }
+
   if (!usage || usage.date !== today) {
     usageMap.set(clientId, { count: 1, date: today });
     return { allowed: true, remaining: DAILY_LIMIT - 1 };

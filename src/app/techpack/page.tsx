@@ -68,6 +68,7 @@ export default function TechPackPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generation failed');
 
+      if (!data.techPack) throw new Error('No tech pack data returned');
       setTechPack({
         ...data.techPack,
         mockupImage: mockupImage || '',
