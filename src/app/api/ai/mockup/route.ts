@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseAIJSON } from '@/lib/ai/parseJSON';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// gemini-2.5-flash supports image gen via responseModalities: ['TEXT','IMAGE']
-// Dedicated image models (gemini-2.5-flash-image) have 0 free-tier quota
-const IMAGE_MODEL = 'gemini-2.5-flash';
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
 const TEXT_MODEL = 'gemini-2.5-flash';
 
 function getGeminiKeys(): string[] {
