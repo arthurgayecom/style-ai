@@ -1,0 +1,142 @@
+[
+  {
+    "id": "01",
+    "garmentType": "baggy joggers",
+    "image": "/brand/design_01.jpg",
+    "description": "Dark gray heavyweight cotton joggers with an oversized relaxed fit, featuring a Burberry-inspired tartan plaid double waistband and a bold AK-47 rifle graphic screen printed on the right leg. Deep side pockets and ribbed elastic ankle cuffs complete this streetwear statement piece.",
+    "instructions": "Dark gray heavyweight 350 GSM cotton baggy joggers, oversized relaxed fit, double waistband with Burberry-inspired tartan plaid pattern, elastic drawstring waist, bold AK-47 rifle graphic screen printed on right leg in black ink, ribbed elastic ankle cuffs, deep side pockets, streetwear urban aesthetic"
+  },
+  {
+    "id": "02",
+    "garmentType": "oversized hoodie",
+    "image": "/brand/design_02.jpg",
+    "description": "Jet black oversized pullover hoodie in 400 GSM heavyweight brushed fleece with an exaggerated boxy fit and drop shoulders. Features a large kangaroo pocket, double-layered hood with black drawstrings, and a subtle tonal embossed logo for understated streetwear luxury.",
+    "instructions": "Jet black oversized pullover hoodie, 400 GSM heavyweight brushed fleece, massively oversized boxy fit with exaggerated drop shoulders, large kangaroo pocket, double-layered hood with black drawstrings, ribbed cuffs and hem, subtle tonal embossed logo on front left chest, raw edge details on hood"
+  },
+  {
+    "id": "03",
+    "garmentType": "baggy cargo pants",
+    "image": "/brand/design_03.jpg",
+    "description": "Olive green baggy parachute cargo pants with an oversized relaxed fit and wide straight legs. Multiple oversized cargo pockets with snap-button flaps, adjustable drawstring waist, and elastic bungee cord ankle closures bring military-inspired utility to streetwear.",
+    "instructions": "Olive green baggy parachute cargo pants, oversized relaxed fit with wide straight legs, multiple oversized cargo pockets with snap-button flaps, adjustable drawstring waist, elastic bungee cord ankle closures, reinforced double knee panels, heavyweight 320 GSM cotton twill, military-inspired streetwear"
+  },
+  {
+    "id": "04",
+    "garmentType": "wide leg track pants",
+    "image": "/brand/design_04.jpg",
+    "description": "Cream off-white wide leg track pants with an ultra-baggy oversized fit and retro 90s aesthetic. Black side stripes run down both legs with a contrast drawstring at the elastic waistband. Zippered ankle openings and 280 GSM French terry fabric complete the vintage sportswear look.",
+    "instructions": "Cream off-white wide leg track pants, ultra-baggy oversized fit, side stripe detail in black running down both legs, elastic waistband with contrast black drawstring, zippered ankle openings, two side pockets, 280 GSM French terry, retro 90s streetwear aesthetic"
+  },
+  {
+    "id": "05",
+    "garmentType": "oversized graphic tee",
+    "image": "/brand/design_05.jpg",
+    "description": "Washed vintage black oversized t-shirt in heavyweight 300 GSM cotton with a massively boxy dropped shoulder fit. Features a large abstract skull graphic across the entire back in cracked white ink, raw hem finish, and distressed wash effect for underground streetwear credibility.",
+    "instructions": "Washed vintage black oversized t-shirt, heavyweight 300 GSM cotton, massively boxy dropped shoulder fit, large abstract skull graphic across the entire back in cracked white ink, ribbed crew neck, raw hem finish, distressed wash effect, underground streetwear vibe"
+  },
+  {
+    "id": "06",
+    "garmentType": "oversized puffer vest",
+    "image": "/brand/design_06.jpg",
+    "description": "Matte black oversized cropped puffer vest with a boxy silhouette and high collar snap closure. Quilted horizontal baffles with synthetic fill and water-resistant nylon shell make this the ultimate heavyweight streetwear layering piece.",
+    "instructions": "Matte black oversized cropped puffer vest, boxy silhouette, high collar with snap closure, two large front welt pockets, quilted horizontal baffles, water-resistant nylon shell, heavyweight streetwear layering piece"
+  },
+  {
+    "id": "07",
+    "garmentType": "baggy work pants",
+    "image": "/brand/design_07.jpg",
+    "description": "Khaki tan baggy double-knee work pants in heavy 14oz cotton canvas with an ultra wide leg relaxed fit. Reinforced double-layer knee panels, hammer loop, multiple tool pockets, and brass hardware bring carpenter functionality to modern streetwear.",
+    "instructions": "Khaki tan baggy double-knee work pants, ultra wide leg relaxed fit, heavy 14oz cotton canvas, reinforced double-layer knee panels, hammer loop, multiple tool pockets, wide belt loops, brass zipper, carpenter streetwear"
+  },
+  {
+    "id": "08",
+    "garmentType": "oversized zip-up hoodie",
+    "image": "/brand/design_08.jpg",
+    "description": "Charcoal dark gray oversized full-zip hoodie in 380 GSM heavyweight French terry with a relaxed boxy fit and drop shoulders. Features an oversized hood, heavy-gauge metal zipper, and ribbed cuffs — a streetwear wardrobe essential.",
+    "instructions": "Charcoal dark gray oversized full-zip hoodie, 380 GSM heavyweight French terry, relaxed boxy fit with drop shoulders, oversized hood, heavy metal zipper, ribbed cuffs, streetwear essential"
+  },
+  {
+    "id": "09",
+    "garmentType": "baggy basketball shorts",
+    "image": "/brand/design_09.jpg",
+    "description": "Black and white color-blocked oversized basketball shorts with a knee-length baggy fit. Mesh side panels for breathability, bold white stripes down the sides, and deep pockets create an athletic-streetwear crossover piece.",
+    "instructions": "Black and white color-blocked oversized basketball shorts, knee-length baggy fit, mesh side panels, elastic waistband with drawstring, deep side pockets, bold white stripes down sides, athletic streetwear crossover"
+  },
+  {
+    "id": "10",
+    "garmentType": "oversized crewneck sweatshirt",
+    "image": "/brand/design_10.jpg",
+    "description": "Stone washed navy blue oversized crewneck sweatshirt in 360 GSM heavyweight fleece with an extremely boxy fit and drop shoulders. Ribbed collar, cuffs, and hem with a subtle embroidered logo on chest deliver premium vintage streetwear basics.",
+    "instructions": "Stone washed navy blue oversized crewneck sweatshirt, 360 GSM heavyweight fleece, extremely boxy fit with drop shoulders, ribbed collar cuffs and hem, embroidered small logo on chest, vintage garment-dyed wash, premium streetwear"
+  },
+  {
+    "id": "11",
+    "garmentType": "baggy denim jeans",
+    "image": "/brand/design_11.jpg",
+    "description": "Washed indigo blue super baggy wide-leg jeans in 14oz raw selvedge denim with an extremely relaxed oversized fit. Five-pocket western styling, contrast orange topstitching, and a barrel leg silhouette channel 90s hip-hop streetwear energy.",
+    "instructions": "Washed indigo blue super baggy wide-leg jeans, extremely relaxed oversized fit, 14oz raw selvedge denim, five pocket western styling, contrast orange topstitching, barrel leg silhouette, 90s hip-hop streetwear"
+  },
+  {
+    "id": "12",
+    "garmentType": "oversized bomber jacket",
+    "image": "/brand/design_12.jpg",
+    "description": "Forest green oversized satin bomber jacket with a boxy relaxed fit and MA-1 military inspiration. Ribbed collar, cuffs, and hem in black with quilted orange lining visible at the collar. Two front slant pockets and brass zipper complete the classic silhouette.",
+    "instructions": "Forest green oversized satin bomber jacket, boxy relaxed fit, ribbed collar cuffs and hem in black, quilted orange lining visible at collar, two front slant pockets, brass zipper, MA-1 military-inspired streetwear"
+  },
+  {
+    "id": "13",
+    "garmentType": "baggy sweatpants",
+    "image": "/brand/design_13.jpg",
+    "description": "Heather gray classic baggy sweatpants in 330 GSM heavyweight fleece with a super relaxed fit and tapered elastic ankle cuffs. Wide elastic waistband with external drawcord and deep pockets make these vintage washed essentials perfect for everyday streetwear.",
+    "instructions": "Heather gray classic baggy sweatpants, 330 GSM heavyweight fleece, super relaxed fit with tapered elastic ankle cuffs, wide elastic waistband with external drawcord, deep side pockets, vintage washed, essential streetwear basics"
+  },
+  {
+    "id": "14",
+    "garmentType": "oversized varsity jacket",
+    "image": "/brand/design_14.jpg",
+    "description": "Black and cream oversized wool varsity jacket with black leather sleeves and snap-button front closure. Ribbed collar, cuffs, and hem with dual stripes and a large chenille letter patch on the chest bring collegiate heritage to modern streetwear proportions.",
+    "instructions": "Black and cream oversized wool varsity jacket, leather sleeves in black, snap-button front closure, ribbed collar cuffs and hem with dual stripes, large chenille letter patch on front left chest, two welt pockets, collegiate streetwear"
+  },
+  {
+    "id": "15",
+    "garmentType": "baggy parachute pants",
+    "image": "/brand/design_15.jpg",
+    "description": "Black technical nylon baggy parachute pants with ultra-wide legs gathered at the ankles via elastic and toggles. Multiple zip cargo pockets and reflective detailing bring futuristic techwear energy to oversized streetwear silhouettes.",
+    "instructions": "Black technical nylon baggy parachute pants, ultra-wide leg with gathering at ankles via elastic and toggles, multiple zip cargo pockets, elastic waistband, reflective detailing on pockets, futuristic techwear streetwear"
+  },
+  {
+    "id": "16",
+    "garmentType": "oversized long sleeve tee",
+    "image": "/brand/design_16.jpg",
+    "description": "Washed burgundy oversized long sleeve t-shirt in 260 GSM cotton jersey with an extremely relaxed dropped shoulder fit. Extended length covers past the hips with a vintage distressed wash, making it the ideal minimalist streetwear layering piece.",
+    "instructions": "Washed burgundy oversized long sleeve t-shirt, 260 GSM cotton jersey, extremely relaxed dropped shoulder fit, ribbed crew neck, extended length covering past the hips, subtle back neck label, vintage distressed wash, minimalist streetwear layering piece"
+  },
+  {
+    "id": "17",
+    "garmentType": "baggy corduroy pants",
+    "image": "/brand/design_17.jpg",
+    "description": "Dark brown wide-wale corduroy baggy pants with a relaxed oversized fit and pleated front. Wide straight legs, deep pockets, button fly, and heavyweight corduroy fabric deliver 70s retro-inspired streetwear character.",
+    "instructions": "Dark brown wide-wale corduroy baggy pants, relaxed oversized fit, pleated front, wide straight legs, deep pockets, button fly, belt loops, heavyweight corduroy, 70s retro-inspired streetwear"
+  },
+  {
+    "id": "18",
+    "garmentType": "oversized quarter-zip fleece",
+    "image": "/brand/design_18.jpg",
+    "description": "Oatmeal beige oversized quarter-zip fleece pullover in 350 GSM plush sherpa fleece with a boxy fit and drop shoulders. Metal quarter-zip with pull tab and a kangaroo pocket bring cozy outdoor comfort to streetwear styling.",
+    "instructions": "Oatmeal beige oversized quarter-zip fleece pullover, 350 GSM plush sherpa fleece, boxy fit with drop shoulders, metal quarter-zip with pull tab, kangaroo pocket, ribbed cuffs, cozy outdoor streetwear"
+  },
+  {
+    "id": "19",
+    "garmentType": "baggy utility shorts",
+    "image": "/brand/design_19.jpg",
+    "description": "Washed black baggy utility cargo shorts in heavyweight cotton ripstop with a just-below-knee length cut. Multiple cargo pockets with velcro flaps, elastic waistband with drawstring, and tactical-inspired design bring military utility to summer streetwear.",
+    "instructions": "Washed black baggy utility cargo shorts, just-below-knee length, multiple cargo pockets with velcro flaps, elastic waistband with drawstring, heavyweight cotton ripstop, tactical-inspired streetwear"
+  },
+  {
+    "id": "20",
+    "garmentType": "oversized windbreaker",
+    "image": "/brand/design_20.jpg",
+    "description": "Two-tone black and electric blue oversized windbreaker jacket in lightweight nylon with a boxy fit and half-zip high collar. Elasticated cuffs and hem with a chest zip pocket and reflective logo on back channel 90s sportswear energy into modern streetwear.",
+    "instructions": "Two-tone black and electric blue oversized windbreaker jacket, lightweight nylon shell, boxy fit, half-zip with high collar, elasticated cuffs and hem, one chest pocket with zip, reflective logo on back, 90s sportswear streetwear"
+  }
+]
