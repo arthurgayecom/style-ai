@@ -53,6 +53,7 @@ export default function DesignPage() {
     getItem('design_preferences', {
       fit: '',
       hemStyle: '',
+      weight: '',
       aesthetic: '',
       avoid: '',
     })
@@ -350,7 +351,7 @@ export default function DesignPage() {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Default Fit</label>
                     <select
@@ -359,6 +360,7 @@ export default function DesignPage() {
                       className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
                     >
                       <option value="">Not set</option>
+                      <option value="Same fit as reference image — match the exact silhouette and proportions from the uploaded reference">Similar to Reference Image</option>
                       <option value="Ultra baggy oversized wide-leg">Ultra Baggy / Oversized</option>
                       <option value="Relaxed oversized">Relaxed Oversized</option>
                       <option value="Regular fit">Regular Fit</option>
@@ -381,6 +383,20 @@ export default function DesignPage() {
                     </select>
                   </div>
                   <div>
+                    <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Fabric Weight</label>
+                    <select
+                      value={preferences.weight || ''}
+                      onChange={(e) => updatePref('weight', e.target.value)}
+                      className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
+                    >
+                      <option value="">Not set</option>
+                      <option value="Lightweight fabric 130-160 GSM">Lightweight (130-160 GSM)</option>
+                      <option value="Midweight fabric 180-220 GSM">Midweight (180-220 GSM)</option>
+                      <option value="Heavyweight fabric 280-320 GSM">Heavyweight (280-320 GSM)</option>
+                      <option value="Premium heavyweight fabric 350+ GSM">Premium Heavy (350+ GSM)</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Aesthetic</label>
                     <select
                       value={preferences.aesthetic || ''}
@@ -395,7 +411,7 @@ export default function DesignPage() {
                       <option value="Athletic sportswear performance">Athletic</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Always Avoid</label>
                     <input
                       type="text"

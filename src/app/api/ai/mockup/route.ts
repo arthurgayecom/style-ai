@@ -279,6 +279,16 @@ function extractConstraints(
         if (lower.includes('screen print')) {
           mustHave.push('screen-printed graphic');
         }
+        // Detect fabric weight from answers
+        if (lower.includes('lightweight') && (lower.includes('gsm') || lower.includes('french terry') || lower.includes('loopback'))) {
+          mustHave.push('lightweight fabric');
+        }
+        if (lower.includes('medium-weight') || lower.includes('midweight') || (lower.includes('medium') && lower.includes('weight'))) {
+          mustHave.push('midweight fabric');
+        }
+        if (lower.includes('heavyweight') || lower.includes('heavy weight') || (lower.includes('heavy') && lower.includes('fleece'))) {
+          mustHave.push('heavyweight fabric');
+        }
       }
     }
   }
@@ -290,6 +300,9 @@ function extractConstraints(
       if (fit.includes('baggy') || fit.includes('oversized') || fit.includes('ultra')) {
         mustHave.push('ultra baggy oversized fit');
       }
+      if (fit.includes('same fit as reference') || fit.includes('similar to reference')) {
+        mustHave.push('same fit and silhouette as the reference image');
+      }
     }
     if (preferences.hemStyle) {
       const hem = preferences.hemStyle.toLowerCase();
@@ -297,6 +310,14 @@ function extractConstraints(
         mustHave.push('open straight-cut hem');
         mustNot.push('elastic cuffs', 'ribbed cuffs');
       }
+    }
+    if (preferences.weight) {
+      const weight = preferences.weight.toLowerCase();
+      if (weight.includes('lightweight')) mustHave.push('lightweight fabric 130-160 GSM');
+      else if (weight.includes('midweight')) mustHave.push('midweight fabric 180-220 GSM');
+      else if (weight.includes('premium')) mustHave.push('premium heavyweight fabric 350+ GSM');
+      else if (weight.includes('heavyweight')) mustHave.push('heavyweight fabric 280-320 GSM');
+      else if (weight.trim()) mustHave.push(preferences.weight);
     }
     if (preferences.avoid) {
       const avoids = preferences.avoid.split(',').map(s => s.trim()).filter(Boolean);
@@ -434,6 +455,8 @@ CRITICAL RULES for the imagePrompt:
 - If the user says "baggy" or "oversized" you MUST write "ultra baggy oversized wide-leg" in the first line
 - If the user says "full-size graphic" you MUST write "large full-length graphic covering most of the leg"
 - If reference images show a specific graphic (like an AK-47), describe it exactly — don't minimize or change it
+- If the user wants "same fit as reference image", study the reference images closely and describe the EXACT silhouette, proportions, and fit you see — match it precisely
+- If a fabric weight is specified (e.g. "heavyweight 280-320 GSM"), include it in the imagePrompt
 - Do NOT add design elements the user didn't ask for (no extra pockets, logos, patterns, or embellishments)
 - Do NOT change the silhouette (if user says baggy, do NOT make it slim or tapered)
 - End with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."
