@@ -422,6 +422,11 @@ function enforceConstraints(imagePrompt: string, mustHave: string[], mustNot: st
     prompt = injections.join('. ') + '. ' + prompt;
   }
 
+  // Always enforce: front-facing, no matching set, correct outfit pairing
+  if (!lower.includes('front-facing') && !lower.includes('front facing')) {
+    prompt = 'Front-facing model, natural relaxed pose. ' + prompt;
+  }
+
   return prompt;
 }
 
@@ -461,6 +466,17 @@ async function handleGenerate(body: Record<string, unknown>) {
 
     if (instructions) contextLines.push(`Additional: ${instructions}`);
 
+    // Add explicit outfit instruction based on garment category
+    const isBottom = /pant|jean|jogger|cargo|short|trouser|sweat/i.test(garmentType as string);
+    const isJacket = /jacket|bomber|coat|windbreaker|parka/i.test(garmentType as string);
+    if (isBottom) {
+      contextLines.push(`OUTFIT RULE: Model must wear ONLY a plain white t-shirt on top (no jacket, no hoodie, no matching top) and simple white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+    } else if (isJacket) {
+      contextLines.push(`OUTFIT RULE: Model must wear a plain white t-shirt underneath, simple blue jeans, and white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+    } else {
+      contextLines.push(`OUTFIT RULE: Model must wear simple blue jeans or plain black pants on bottom and white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+    }
+
     // Build mandatory constraint sections
     let constraintBlock = '';
     if (mustHave.length > 0 || mustNot.length > 0) {
@@ -492,7 +508,17 @@ Your ONLY job: faithfully translate the user's design specs + reference images i
 2. NEXT: Construction details — waistband, pockets, panels, stripes, graphics
 3. NEXT: Fabric + weight + color specifics
 4. NEXT: What's NOT on the garment (every MUST NOT becomes "no [item]")
-5. LAST LINE ALWAYS: "Professional fashion product photo on model, studio lighting, clean background, high-end streetwear lookbook, 8k sharp detail"
+5. NEXT: What the MODEL wears BESIDES the target garment (see OUTFIT RULES below)
+6. LAST LINE ALWAYS: "Professional fashion product photo, front-facing model, studio lighting, clean white/grey background, high-end streetwear lookbook, 8k sharp detail"
+
+=== OUTFIT RULES (CRITICAL — prevents wrong items appearing) ===
+- The target garment is the ONLY featured piece. Everything else the model wears must be PLAIN and NEUTRAL so it doesn't distract or mislead.
+- If designing BOTTOMS (pants, jeans, cargos, joggers, sweats, shorts): model wears a PLAIN WHITE T-SHIRT tucked or untucked, and simple white sneakers. NO jacket, NO hoodie, NO matching set, NO accessories.
+- If designing TOPS (tee, hoodie, jacket, sweater): model wears SIMPLE BLUE JEANS or plain black pants, and simple white sneakers. NO hat, NO bag, NO extra layers.
+- If designing a JACKET: model wears a plain white tee underneath, simple blue jeans, white sneakers.
+- NEVER generate a matching set or coordinated outfit — the viewer must instantly know which single piece is the product.
+- The model should be FRONT-FACING with a natural relaxed pose, arms slightly away from body so the garment silhouette is fully visible.
+- The garment must be shown RIGHT-SIDE FORWARD (not backwards) — front pockets, fly, waistband drawstring, and any front details must be visible.
 
 === HARD RULES ===
 - UNDER 200 words total
@@ -504,7 +530,8 @@ Your ONLY job: faithfully translate the user's design specs + reference images i
 - Include fabric weight when specified (e.g., "heavyweight 320 GSM French terry")
 - NEVER add elements the user didn't request (no extra pockets, logos, patterns, stripes, embellishments)
 - NEVER change the silhouette — if user says wide-leg, you CANNOT output slim, tapered, or fitted
-- Describe the garment ON A MODEL wearing sneakers (not flat-lay) for better AI understanding of fit and drape
+- NEVER show the garment backwards — always front view with all front details visible
+- The model must look natural and well-proportioned — no distorted limbs, no weird poses
 ${constraintBlock}
 ${prefBlock}
 
@@ -620,7 +647,9 @@ RULES:
 - Your imagePrompt describes the FULL garment (current design + edit applied) ON A MODEL
 - Be extremely specific about preserved elements — describe colors, materials, and construction exactly as they appear
 - Keep under 200 words
-- End with: "Professional fashion product photo on model, studio lighting, clean background, high-end streetwear lookbook, 8k sharp detail"
+- OUTFIT: If the garment is bottoms, model wears ONLY a plain white t-shirt and white sneakers. If tops, model wears simple blue jeans and white sneakers. NEVER add matching sets or extra layers.
+- The garment must be shown FRONT-FACING, right-side forward (not backwards). Model in natural relaxed pose.
+- End with: "Professional fashion product photo, front-facing model, studio lighting, clean white/grey background, high-end streetwear lookbook, 8k sharp detail"
 ${constraintBlock}
 ${prefBlock}
 

@@ -258,18 +258,41 @@ export default function BrandPage() {
                 </div>
 
                 <div className="mt-6 flex gap-3">
-                  <Link
-                    href="/design"
-                    className="flex-1 rounded-xl bg-white px-4 py-3 text-center text-sm font-bold text-black transition-all hover:shadow-lg"
+                  <button
+                    onClick={() => {
+                      // Store design data so design page loads directly into review/edit
+                      const designResult = {
+                        id: `brand-${selected.id}`,
+                        mockupImage: `${selected.image}?v=1`,
+                        description: selected.description,
+                        garmentType: selected.garmentType,
+                        createdAt: new Date().toISOString(),
+                        specs: null,
+                      };
+                      localStorage.setItem('edit_from_brand', JSON.stringify(designResult));
+                      window.location.href = '/design';
+                    }}
+                    className="flex-1 rounded-xl bg-white px-4 py-3 text-center text-sm font-bold text-black transition-all hover:shadow-lg cursor-pointer"
                   >
                     Edit in Studio
-                  </Link>
-                  <Link
-                    href="/techpack"
-                    className="flex-1 rounded-xl border border-border px-4 py-3 text-center text-sm font-semibold text-text-primary transition-all hover:bg-bg-hover"
+                  </button>
+                  <button
+                    onClick={() => {
+                      const designResult = {
+                        id: `brand-${selected.id}`,
+                        mockupImage: `${selected.image}?v=1`,
+                        description: selected.description,
+                        garmentType: selected.garmentType,
+                        createdAt: new Date().toISOString(),
+                        specs: null,
+                      };
+                      localStorage.setItem('techpack_from_design', JSON.stringify(designResult));
+                      window.location.href = '/techpack';
+                    }}
+                    className="flex-1 rounded-xl border border-border px-4 py-3 text-center text-sm font-semibold text-text-primary transition-all hover:bg-bg-hover cursor-pointer"
                   >
                     Tech Pack
-                  </Link>
+                  </button>
                 </div>
               </div>
             </motion.div>

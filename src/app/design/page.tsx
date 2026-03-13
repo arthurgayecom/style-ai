@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GARMENT_TYPES, PART_LABELS } from '@/types/mockup';
 import type { ReferenceImage, PartLabel, DesignQuestion, DesignAnswer, MockupResult, DesignStep } from '@/types/mockup';
@@ -35,7 +35,31 @@ export default function DesignPage() {
 
   // Step 4: Generate
   const [generating, setGenerating] = useState(false);
-  const [result, setResult] = useState<MockupResult | null>(null);
+  const [result, setResult] = useState<MockupResult | null>(() => {
+    // Check if coming from brand page with a design to edit
+    if (typeof window !== 'undefined') {
+      const brandData = localStorage.getItem('edit_from_brand');
+      if (brandData) {
+        localStorage.removeItem('edit_from_brand');
+        try {
+          const parsed = JSON.parse(brandData);
+          // Need to convert relative image URL to full data URL for editing
+          // For now, store the URL — the edit flow will handle it
+          return parsed as MockupResult;
+        } catch { /* ignore */ }
+      }
+    }
+    return null;
+  });
+
+  // If we loaded from brand page, jump to review step
+  const [initializedFromBrand] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hadBrand = result !== null && result.id?.startsWith('brand-');
+      return hadBrand;
+    }
+    return false;
+  });
 
   // Step 5: Review & Edit
   const [editText, setEditText] = useState('');
@@ -63,6 +87,28 @@ export default function DesignPage() {
     setPreferences(next);
     setItem('design_preferences', next);
   };
+
+  // If loaded from brand page, jump to review step with that design
+  useEffect(() => {
+    if (initializedFromBrand && result) {
+      setStep('review');
+      if (result.garmentType) setGarmentType(result.garmentType);
+      // Convert relative URL to base64 data URL so edit API can send it to Gemini
+      if (result.mockupImage && !result.mockupImage.startsWith('data:')) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext('2d')?.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          setResult(prev => prev ? { ...prev, mockupImage: dataUrl } : prev);
+        };
+        img.src = result.mockupImage;
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Step 1: Upload References ──
   const addImages = useCallback((files: FileList | File[]) => {
@@ -744,25 +790,104 @@ export default function DesignPage() {
                   </button>
                 </div>
 
-                {/* Quick Edit Suggestions */}
+                {/* Manual Editing Tools */}
                 <div className="rounded-2xl border border-border bg-bg-card p-5">
-                  <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Quick Edits</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      'Make it more baggy/oversized', 'Remove the cuffs (open hem)',
-                      'Add side stripe panels', 'Change to heavyweight fleece',
-                      'Add contrast waistband', 'Remove all logos/branding',
-                      'Make the graphic bigger', 'Add cargo pockets',
-                      'Switch to dark wash', 'Make legs wider',
-                    ].map(suggestion => (
-                      <button
-                        key={suggestion}
-                        onClick={() => setEditText(suggestion)}
-                        className="rounded-md border border-border px-2 py-1 text-[10px] text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
+                  <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3">Manual Edit Tools</h3>
+
+                  {/* Silhouette & Fit */}
+                  <div className="mb-3">
+                    <p className="text-[9px] font-bold text-purple-400 uppercase tracking-wider mb-1.5">Silhouette & Fit</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Wider Legs', cmd: 'Make the legs significantly wider and more oversized, increase volume throughout' },
+                        { label: 'Narrower', cmd: 'Make the legs narrower and more tapered' },
+                        { label: 'More Baggy', cmd: 'Make the entire garment much more baggy and oversized with extreme volume' },
+                        { label: 'Longer', cmd: 'Make the garment longer so it pools more on the ground' },
+                        { label: 'Shorter/Cropped', cmd: 'Make the garment shorter, cropped length' },
+                        { label: 'Drop Crotch', cmd: 'Add a lower drop crotch for a more relaxed oversized look' },
+                      ].map(t => (
+                        <button key={t.label} onClick={() => { setEditText(t.cmd); }} className="rounded-md border border-purple-500/20 bg-purple-500/5 px-2 py-1 text-[10px] text-purple-400 hover:bg-purple-500/15 transition-colors">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Remove Elements */}
+                  <div className="mb-3">
+                    <p className="text-[9px] font-bold text-red-400 uppercase tracking-wider mb-1.5">Remove</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Remove Logo', cmd: 'Remove all logos and branding from the garment completely, make it clean with no visible logos' },
+                        { label: 'Remove Cuffs', cmd: 'Remove elastic cuffs at ankles, replace with open straight-cut hem that drags on ground, absolutely no ribbed cuffs' },
+                        { label: 'Remove Print', cmd: 'Remove all graphic prints from the garment, make it clean solid color' },
+                        { label: 'Remove Pockets', cmd: 'Remove all visible pockets from the garment' },
+                        { label: 'Remove Stripes', cmd: 'Remove all side stripes and stripe panels from the garment' },
+                        { label: 'Remove Drawstring', cmd: 'Remove the drawstring from the waistband' },
+                      ].map(t => (
+                        <button key={t.label} onClick={() => { setEditText(t.cmd); }} className="rounded-md border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400 hover:bg-red-500/15 transition-colors">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add Elements */}
+                  <div className="mb-3">
+                    <p className="text-[9px] font-bold text-green-400 uppercase tracking-wider mb-1.5">Add</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Side Stripes', cmd: 'Add three white sport stripes running down the outer side seam of each leg' },
+                        { label: 'Cargo Pockets', cmd: 'Add large cargo pockets on both thighs with button flap closure' },
+                        { label: 'Contrast Waistband', cmd: 'Add a plaid tartan contrast fabric waistband visible above the elastic' },
+                        { label: 'Double Waistband', cmd: 'Add a double-layered elastic waistband with contrasting inner layer visible' },
+                        { label: 'Drawstring', cmd: 'Add an external drawstring to the waistband with metal aglet tips' },
+                        { label: 'Side Panels', cmd: 'Add curved contrasting black fabric panels on the outer side of each leg' },
+                      ].map(t => (
+                        <button key={t.label} onClick={() => { setEditText(t.cmd); }} className="rounded-md border border-green-500/20 bg-green-500/5 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/15 transition-colors">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fabric & Texture */}
+                  <div className="mb-3">
+                    <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider mb-1.5">Fabric & Texture</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Heavyweight Fleece', cmd: 'Change fabric to heavyweight 340 GSM brushed cotton fleece with thick substantial feel' },
+                        { label: 'French Terry', cmd: 'Change fabric to French terry cotton with loopback interior texture' },
+                        { label: 'Heavy Denim', cmd: 'Change fabric to heavyweight raw denim with rigid construction' },
+                        { label: 'Corduroy', cmd: 'Change fabric to thick wide-wale corduroy' },
+                        { label: 'Distressed/Washed', cmd: 'Add a vintage garment-dyed distressed wash with fading at thighs and knees' },
+                        { label: 'Ripstop Nylon', cmd: 'Change fabric to military ripstop nylon with slight sheen' },
+                      ].map(t => (
+                        <button key={t.label} onClick={() => { setEditText(t.cmd); }} className="rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-400 hover:bg-amber-500/15 transition-colors">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Color */}
+                  <div>
+                    <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-1.5">Color</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Black', cmd: 'Change the main color to solid black' },
+                        { label: 'Heather Grey', cmd: 'Change the main color to heather grey' },
+                        { label: 'Cream/Off-White', cmd: 'Change the main color to cream off-white' },
+                        { label: 'Navy', cmd: 'Change the main color to dark navy blue' },
+                        { label: 'Olive', cmd: 'Change the main color to olive green' },
+                        { label: 'Brown', cmd: 'Change the main color to dark brown chocolate' },
+                        { label: 'Camo', cmd: 'Change to woodland camouflage pattern in green/brown/black' },
+                      ].map(t => (
+                        <button key={t.label} onClick={() => { setEditText(t.cmd); }} className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[10px] text-cyan-400 hover:bg-cyan-500/15 transition-colors">
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
