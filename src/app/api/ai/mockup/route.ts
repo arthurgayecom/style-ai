@@ -56,35 +56,34 @@ async function callGemini(
   throw new Error('All AI keys are rate-limited. Try again in a minute.');
 }
 
-// ── Generate image via free API (airforce) with Together.ai fallback ──
-async function generateImage(prompt: string, width = 1024, height = 1024): Promise<string> {
-  // Try free airforce API first (no key needed, FLUX models)
-  for (let attempt = 0; attempt < 10; attempt++) {
+// ── Models to try in order: best quality first, fastest last ──
+const IMAGE_MODELS = [
+  'flux-realism',       // Photorealistic — best for fashion mockups
+  'flux',               // Base FLUX — good general quality
+  'flux-2-klein-4b',    // Small/fast fallback
+];
+
+// ── Try a single model on airforce API, return base64 or null ──
+async function tryAirforceModel(model: string, prompt: string, width: number, height: number): Promise<string | null> {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       if (attempt > 0) await new Promise(r => setTimeout(r, 1000 + attempt * 1000));
 
       const res = await fetch(AIRFORCE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'flux-2-klein-4b',
-          prompt,
-          size: `${width}x${height}`,
-          n: 1,
-        }),
+        body: JSON.stringify({ model, prompt, size: `${width}x${height}`, n: 1 }),
       });
 
       if (res.status === 429) continue; // rate limited, retry
 
       if (res.ok) {
         const data = await res.json();
-        const imageUrl = data?.data?.[0]?.url;
         const b64 = data?.data?.[0]?.b64_json;
-
         if (b64) return `data:image/png;base64,${b64}`;
 
+        const imageUrl = data?.data?.[0]?.url;
         if (imageUrl) {
-          // Fetch image from URL and convert to base64
           const imgRes = await fetch(imageUrl);
           if (imgRes.ok) {
             const buffer = await imgRes.arrayBuffer();
@@ -94,9 +93,22 @@ async function generateImage(prompt: string, width = 1024, height = 1024): Promi
           }
         }
       }
+
+      // Non-429 error (model not found, etc.) — skip to next model
+      if (!res.ok && res.status !== 429) return null;
     } catch {
-      // Network error, try next attempt
+      // Network error
     }
+  }
+  return null; // All retries exhausted for this model
+}
+
+// ── Generate image: cascade through models from best to fastest ──
+async function generateImage(prompt: string, width = 1024, height = 1024): Promise<string> {
+  // Try each model in priority order on airforce API
+  for (const model of IMAGE_MODELS) {
+    const result = await tryAirforceModel(model, prompt, width, height);
+    if (result) return result;
   }
 
   // Fallback to Together.ai if key is available
