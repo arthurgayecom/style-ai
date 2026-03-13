@@ -1,0 +1,306 @@
+[
+  {
+    "id": "SW01",
+    "garmentType": "Sweatpants",
+    "name": "Contrast Panel Sweats",
+    "image": "/brand/vaste/sw01.jpg",
+    "description": "Heather grey ultra-wide sweatpants with black contrast waistband and curved side stripe panels. Open hem, heavyweight terry.",
+    "instructions": "Grey French terry, 340 GSM. Black contrast elastic waistband. Curved black panels on outer leg with 3 white stripes. Open hem. Deep slant pockets. Drawstring with metal aglets."
+  },
+  {
+    "id": "SW02",
+    "garmentType": "Sweatpants",
+    "name": "Plaid Waistband Sweats",
+    "image": "/brand/vaste/sw02.jpg",
+    "description": "Heather grey wide-leg sweats with exposed red tartan plaid waistband detail. White side stripes and embroidered heart logo.",
+    "instructions": "Grey cotton fleece, 320 GSM. Double waistband: inner elastic + outer red tartan plaid band. 3 white side stripes. Embroidered heart logo left thigh. Open hem."
+  },
+  {
+    "id": "SW03",
+    "garmentType": "Sweatpants",
+    "name": "Midnight Drape Sweats",
+    "image": "/brand/vaste/sw03.jpg",
+    "description": "All-black ultra-wide sweatpants with double-layered waistband showing grey inner layer. Kangaroo front pocket. Clean minimal.",
+    "instructions": "Black heavyweight fleece, 360 GSM. Double waistband (black outer + heather grey inner). Front kangaroo pocket. Gunmetal aglets. Open hem. No visible branding."
+  },
+  {
+    "id": "SW04",
+    "garmentType": "Sweatpants",
+    "name": "Cream Cloud Sweats",
+    "image": "/brand/vaste/sw04.jpg",
+    "description": "Cream off-white ultra-wide sweats with brown contrast stitching and brown waistband. Tonal embossed branding.",
+    "instructions": "Cream/off-white brushed fleece, 340 GSM. Brown contrast topstitching. Brown elastic waistband. Cream drawstring. Embossed tonal logo back waistband. Open hem."
+  },
+  {
+    "id": "SW06",
+    "garmentType": "Sweatpants",
+    "name": "Triple Stripe Drape Sweats",
+    "image": "/brand/vaste/sw06.jpg",
+    "description": "Navy blue ultra-wide sweats with bold white triple stripes from waist to hem. Open hem, deep pockets.",
+    "instructions": "Navy French terry, 340 GSM. Three 1.5cm white stripes on outer seam both legs. Navy waistband. White drawstring with metal tips. Open hem. Deep side pockets."
+  },
+  {
+    "id": "SW07",
+    "garmentType": "Sweatpants",
+    "name": "Stone Wash Fleece Sweats",
+    "image": "/brand/vaste/sw07.jpg",
+    "description": "Stone-washed sage green fleece sweats with raw-edge waistband and frayed open hem. Vintage garment-dyed finish.",
+    "instructions": "Sage green garment-dyed fleece, 320 GSM. Stone wash finish. Raw-edge cut waistband. Exposed elastic + drawstring. Back patch pocket only. Frayed open hem."
+  },
+  {
+    "id": "SW08",
+    "garmentType": "Sweatpants",
+    "name": "Archive Panel Sweats",
+    "image": "/brand/vaste/sw08.jpg",
+    "description": "Heather grey sweats with brown corduroy panel inserts on outer thighs. Mixed material design. Open hem.",
+    "instructions": "Grey fleece body 320 GSM + brown corduroy panel inserts (outer thigh, 20x30cm). Grey waistband. Grey drawstring. Deep pockets. Open hem."
+  },
+  {
+    "id": "SW09",
+    "garmentType": "Sweatpants",
+    "name": "Double Layer Sweats",
+    "image": "/brand/vaste/sw09.jpg",
+    "description": "Charcoal ultra-wide sweats with burgundy double waistband detail. Tonal pinstripe texture. Open hem.",
+    "instructions": "Charcoal pinstripe fleece, 340 GSM. Double waistband (charcoal outer + burgundy inner fold). Burgundy drawstring. Open hem. Deep slant pockets."
+  },
+  {
+    "id": "SW10",
+    "garmentType": "Sweatpants",
+    "name": "Chalk White Drape Sweats",
+    "image": "/brand/vaste/sw10.jpg",
+    "description": "Pure chalk white ultra-wide sweats. Minimal design with only a black drawstring for contrast. Premium brushed cotton.",
+    "instructions": "Chalk white brushed fleece, 360 GSM. Black drawstring only contrast element. Deep front pockets. Open hem. Zero branding visible."
+  },
+  {
+    "id": "JN01",
+    "garmentType": "Jeans",
+    "name": "Washed Olive Baggy Jeans",
+    "image": "/brand/vaste/jn01.jpg",
+    "description": "Olive acid-washed ultra-baggy jeans with raw unhemmed edges. Vintage distressed finish. Five-pocket.",
+    "instructions": "14oz rigid denim, olive acid wash. Ultra-wide straight leg. Low rise. Five-pocket. Raw unhemmed edge. Brown leather patch on back."
+  },
+  {
+    "id": "JN03",
+    "garmentType": "Jeans",
+    "name": "Double Knee Work Jeans",
+    "image": "/brand/vaste/jn03.jpg",
+    "description": "Light wash ultra-baggy carpenter jeans with double knee reinforcement. Hammer loop. Tool pocket. Workwear fusion.",
+    "instructions": "14oz light wash denim. Double knee panels. Right-side hammer loop + tool pocket. Wide straight leg. Open hem. Whisker wash."
+  },
+  {
+    "id": "JN04",
+    "garmentType": "Jeans",
+    "name": "Indigo Raw Wide Jeans",
+    "image": "/brand/vaste/jn04.jpg",
+    "description": "Deep indigo raw unwashed ultra-wide jeans. Chain stitch hem. Red selvedge line. Rigid and crisp.",
+    "instructions": "16oz raw unwashed selvedge denim. Deep indigo. Ultra-wide leg. Chain stitch hem. Red selvedge ID. Leather back patch. Five-pocket."
+  },
+  {
+    "id": "JN05",
+    "garmentType": "Jeans",
+    "name": "Mud Wash Balloon Jeans",
+    "image": "/brand/vaste/jn05.jpg",
+    "description": "Brown mud-wash balloon jeans with extreme volume. Heavy fade at thighs. Earthy vintage aesthetic.",
+    "instructions": "14oz denim, brown mud wash. Balloon-leg silhouette. Heavy thigh fade. Five-pocket. Open hem. Mid-rise."
+  },
+  {
+    "id": "JN06",
+    "garmentType": "Jeans",
+    "name": "Bleach Splatter Wide Jeans",
+    "image": "/brand/vaste/jn06.jpg",
+    "description": "Medium blue ultra-wide jeans with artistic bleach splatter treatment. Distressed knee rips. Raw hem.",
+    "instructions": "14oz medium wash denim. Custom bleach splatter treatment. Small knee distressing. Wide straight leg. Raw hem. Five-pocket."
+  },
+  {
+    "id": "JN07",
+    "garmentType": "Jeans",
+    "name": "Snow Wash Parachute Jeans",
+    "image": "/brand/vaste/jn07.jpg",
+    "description": "Snow-white washed ultra-wide parachute jeans with drawstring waist. Light and flowing.",
+    "instructions": "10oz lightweight denim, extreme snow wash. Drawstring waist. Parachute-width legs. Optional ankle drawstring (worn open). Ultra-light finish."
+  },
+  {
+    "id": "JN08",
+    "garmentType": "Jeans",
+    "name": "Charcoal Stripe Wide Jeans",
+    "image": "/brand/vaste/jn08.jpg",
+    "description": "Charcoal grey ultra-wide jeans with white pinstripes on outer seam. Heavyweight denim. Open hem.",
+    "instructions": "15oz charcoal wash denim. Twin white pinstripes on outer seam. Five-pocket. Open hem. Thick rigid construction."
+  },
+  {
+    "id": "CG02",
+    "garmentType": "Cargo Pants",
+    "name": "Black Utility Cargos",
+    "image": "/brand/vaste/cg02.jpg",
+    "description": "All-black ultra-wide cargos with 4 oversized cargo pockets. Snap-button flaps. Nylon webbing belt. Tactical.",
+    "instructions": "Black cotton twill, 300 GSM. 4 cargo pockets (2 thigh + 2 below knee). Snap-button flaps. Nylon webbing belt. Open hem."
+  },
+  {
+    "id": "CG03",
+    "garmentType": "Cargo Pants",
+    "name": "Sand Storm Cargos",
+    "image": "/brand/vaste/cg03.jpg",
+    "description": "Sand beige washed canvas ultra-baggy cargos. Large thigh flap pockets + shin zip pocket. Desert military.",
+    "instructions": "Sand beige washed canvas, 280 GSM. 2 large thigh flap pockets + 1 shin zip pocket. Drawstring waist. Wide leg. Open hem."
+  },
+  {
+    "id": "CG04",
+    "garmentType": "Cargo Pants",
+    "name": "Olive Parachute Cargos",
+    "image": "/brand/vaste/cg04.jpg",
+    "description": "Olive parachute cargos in lightweight nylon. Multiple zip pockets. Drawstring waist + ankles. Techwear military.",
+    "instructions": "Olive nylon ripstop, 180 GSM. Multiple zip pockets. Drawstring waist + ankle toggles. Knee toggles. Extreme wide parachute cut."
+  },
+  {
+    "id": "CG05",
+    "garmentType": "Cargo Pants",
+    "name": "Washed Grey Cargos",
+    "image": "/brand/vaste/cg05.jpg",
+    "description": "Garment-dyed faded grey cargos with angled thigh pockets. White contrast stitching. Vintage surplus feel.",
+    "instructions": "Garment-dyed grey cotton twill, 260 GSM. Angled thigh cargo pockets with velcro. White contrast stitching. Drawstring waist. Open hem."
+  },
+  {
+    "id": "CG06",
+    "garmentType": "Cargo Pants",
+    "name": "Desert Camo Cargos",
+    "image": "/brand/vaste/cg06.jpg",
+    "description": "Desert tri-color camo ultra-baggy cargos. Large pockets. Military fabric belt. Heavy cotton.",
+    "instructions": "Desert camo cotton ripstop, 280 GSM. Tri-color (sand/tan/brown). Large cargo pockets. Military fabric belt. Wide leg open hem."
+  },
+  {
+    "id": "CG07",
+    "garmentType": "Cargo Pants",
+    "name": "Navy Tech Cargos",
+    "image": "/brand/vaste/cg07.jpg",
+    "description": "Dark navy tech cargos with zip cargo pockets and reflective pulls. Water-resistant. Minimalist techwear.",
+    "instructions": "Navy nylon-cotton blend, 240 GSM, DWR coating. Zip cargo pockets with reflective pulls. Hidden drawstring waist. Open hem. Minimalist."
+  },
+  {
+    "id": "CG08",
+    "garmentType": "Cargo Pants",
+    "name": "Brown Earth Cargos",
+    "image": "/brand/vaste/cg08.jpg",
+    "description": "Dark brown washed canvas ultra-baggy cargos. Square thigh pockets. Hammer loop. Workwear-cargo hybrid.",
+    "instructions": "Brown washed canvas, 300 GSM. Square cargo pockets with button flaps. Hammer loop right side. Wide leg. Open hem."
+  },
+  {
+    "id": "JK01",
+    "garmentType": "Jacket",
+    "name": "Cream Varsity Bomber",
+    "image": "/brand/vaste/jk01.jpg",
+    "description": "Cream varsity bomber with cursive script embroidery. Cropped oversized fit. Satin body with ribbed trim.",
+    "instructions": "Cream satin shell, polyester fill. Cropped oversized. Cursive script chest embroidery. Full zip. Ribbed cuffs + hem in cream. Puffed sleeves."
+  },
+  {
+    "id": "JK02",
+    "garmentType": "Jacket",
+    "name": "Khaki Multi-Pocket Jacket",
+    "image": "/brand/vaste/jk02.jpg",
+    "description": "Khaki multi-pocket utility jacket with 4 chest pockets. Crinkled nylon. Boxy oversized fit over hoodie.",
+    "instructions": "Khaki crinkled nylon shell. 4 flap chest pockets. Zip + storm flap. Standing collar. Boxy oversized cut. Layering-friendly."
+  },
+  {
+    "id": "JK03",
+    "garmentType": "Jacket",
+    "name": "Dark Denim Trucker Jacket",
+    "image": "/brand/vaste/jk03.jpg",
+    "description": "Oversized dark wash denim trucker jacket. Boxy fit. Button front. Worn over grey hoodie. Raw hem.",
+    "instructions": "Charcoal-black washed 14oz denim. Oversized trucker cut. 2 chest flap pockets. Metal button front. Raw hem bottom."
+  },
+  {
+    "id": "JK04",
+    "garmentType": "Hoodie",
+    "name": "Grey Heavyweight Zip Hoodie",
+    "image": "/brand/vaste/jk04.jpg",
+    "description": "Heather grey heavyweight zip hoodie. Extreme oversized fit. 400 GSM fleece. Clean minimal, no logos.",
+    "instructions": "Heather grey 400 GSM heavyweight fleece. Oversized boxy fit. Full zip. Kangaroo pocket. Thick drawstring hood. Ribbed cuffs/hem. No branding."
+  },
+  {
+    "id": "JK06",
+    "garmentType": "Jacket",
+    "name": "Olive Flight Bomber",
+    "image": "/brand/vaste/jk06.jpg",
+    "description": "Olive MA-1 bomber jacket, oversized. Orange satin lining. Zip front. Ribbed trim. Classic military flight.",
+    "instructions": "Olive nylon shell, orange satin lining. Oversized MA-1 cut. Zip front + 2 slant pockets. Ribbed collar/cuffs/hem. Slightly cropped."
+  },
+  {
+    "id": "JK07",
+    "garmentType": "Jacket",
+    "name": "Brown Leather Biker Jacket",
+    "image": "/brand/vaste/jk07.jpg",
+    "description": "Distressed brown leather biker jacket. Asymmetric zip. Silver hardware. Oversized boxy with belted hem.",
+    "instructions": "Aged brown leather (or PU). Asymmetric zip. Notch lapel. 4 zip pockets. Belt hem. Silver hardware. Oversized."
+  },
+  {
+    "id": "JK08",
+    "garmentType": "Hoodie",
+    "name": "Sage Double Layer Hoodie",
+    "image": "/brand/vaste/jk08.jpg",
+    "description": "Sage green double-layer hoodie with darker inner showing at hem/cuffs. Garment-dyed vintage wash.",
+    "instructions": "Sage green garment-dyed 360 GSM fleece. Double layer (darker sage inner). Kangaroo pocket. Thick natural drawstrings. Dropped shoulders."
+  },
+  {
+    "id": "JK09",
+    "garmentType": "Jacket",
+    "name": "Cream Puffer Vest",
+    "image": "/brand/vaste/jk09.jpg",
+    "description": "Cream oversized puffer vest. Quilted panels. Snap front. Standing collar. Layered over hoodie.",
+    "instructions": "Cream nylon shell, polyester fill. Quilted panels. Snap-button front. Standing collar. 2 hand-warmer pockets. Boxy oversized."
+  },
+  {
+    "id": "JK10",
+    "garmentType": "Jacket",
+    "name": "Washed Denim Chore Coat",
+    "image": "/brand/vaste/jk10.jpg",
+    "description": "Medium-wash denim chore coat. Boxy oversized. Patch pockets. Brown corduroy collar. French workwear.",
+    "instructions": "Medium wash 14oz denim. Chore coat cut. 3 patch pockets. Brass buttons. Brown corduroy collar. Mid-thigh length."
+  },
+  {
+    "id": "TE01",
+    "garmentType": "T-Shirt",
+    "name": "Heavyweight Box Tee",
+    "image": "/brand/vaste/te01.jpg",
+    "description": "Pure white heavyweight box tee. Extreme oversized. Dropped shoulders. Longer back hem. No graphics.",
+    "instructions": "White 280 GSM combed cotton. Extreme oversized boxy. Dropped shoulders. Split longer-back hem. No branding. Premium blank."
+  },
+  {
+    "id": "TE02",
+    "garmentType": "T-Shirt",
+    "name": "Black Graphic Back Print Tee",
+    "image": "/brand/vaste/te02.jpg",
+    "description": "Black oversized tee with large gothic cathedral back print. Small front logo. Distressed vintage graphics.",
+    "instructions": "Black 280 GSM cotton. Large gothic back print (DTG). Small chest logo. Extreme oversized. Dropped shoulders."
+  },
+  {
+    "id": "TE03",
+    "garmentType": "T-Shirt",
+    "name": "Washed Earth Tone Tee",
+    "image": "/brand/vaste/te03.jpg",
+    "description": "Faded olive garment-dyed oversized tee. Vintage wash. Raw rolled hem. Military surplus aesthetic.",
+    "instructions": "Olive garment-dyed 260 GSM cotton. Vintage wash. Oversized boxy. Dropped shoulders. Raw rolled hem. No graphics."
+  },
+  {
+    "id": "SH01",
+    "garmentType": "Shorts",
+    "name": "Grey Baggy Sweat Shorts",
+    "image": "/brand/vaste/sh01.jpg",
+    "description": "Heather grey ultra-baggy below-knee sweat shorts. Black waistband. Heavy French terry. Raw open hem.",
+    "instructions": "Heather grey 340 GSM French terry. Ultra-wide below-knee length. Black waistband. Drawstring. Deep pockets. Raw hem."
+  },
+  {
+    "id": "SH02",
+    "garmentType": "Shorts",
+    "name": "Black Cargo Shorts",
+    "image": "/brand/vaste/sh02.jpg",
+    "description": "Black ultra-baggy below-knee cargo shorts. Large thigh pockets. Snap flaps. Heavy cotton twill.",
+    "instructions": "Black cotton twill, 300 GSM. Ultra-wide below-knee. 2 thigh cargo pockets with snap flaps. Drawstring waist. Open hem."
+  },
+  {
+    "id": "SH03",
+    "garmentType": "Shorts",
+    "name": "Denim Cutoff Shorts",
+    "image": "/brand/vaste/sh03.jpg",
+    "description": "Medium wash denim ultra-baggy cutoff shorts. Raw frayed hem. Knee-length. Five-pocket rigid denim.",
+    "instructions": "14oz medium wash denim. Ultra-wide knee-length. Raw cutoff hem. Five-pocket. Rigid construction."
+  }
+]
