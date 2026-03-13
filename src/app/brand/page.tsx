@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
 import Link from 'next/link';
 
 interface BrandDesign {
@@ -91,23 +90,19 @@ export default function BrandPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((design, i) => (
-            <motion.div
+          {filtered.map((design) => (
+            <div
               key={design.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
               onClick={() => setSelected(design)}
               className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-bg-card transition-all hover:border-purple-400/50 hover:shadow-lg"
               style={{ boxShadow: 'var(--card-shadow)' }}
             >
-              <div className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-gray-800">
-                <Image
-                  src={`${design.image}?v=2`}
+              <div className="relative aspect-square overflow-hidden">
+                {/* Plain img tag — no Next.js Image lazy loading, no intersection observer */}
+                <img
+                  src={`${design.image}?v=3`}
                   alt={design.garmentType}
-                  fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                 <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
@@ -122,7 +117,7 @@ export default function BrandPage() {
                   {design.description}
                 </p>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -156,12 +151,10 @@ export default function BrandPage() {
               </button>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
-              <Image
-                src={selected.image}
+            <div className="mt-4 overflow-hidden rounded-xl">
+              <img
+                src={`${selected.image}?v=3`}
                 alt={selected.garmentType}
-                width={600}
-                height={600}
                 className="w-full object-contain"
               />
             </div>

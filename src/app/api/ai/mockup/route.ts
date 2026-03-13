@@ -208,14 +208,164 @@ Generate questions to fully specify this ${garmentType} for manufacturing.`;
   }
 }
 
+// ── Extract MUST HAVE / MUST NOT HAVE constraints from user answers + preferences ──
+function extractConstraints(
+  answerList: Array<{ questionId: string; answer: string | string[] }> | undefined,
+  preferences: Record<string, string> | undefined,
+  instructions: unknown,
+): { mustHave: string[]; mustNot: string[] } {
+  const mustHave: string[] = [];
+  const mustNot: string[] = [];
+
+  // Parse answers for constraint keywords
+  if (answerList) {
+    for (const a of answerList) {
+      if (!a.answer) continue;
+      const vals = Array.isArray(a.answer) ? a.answer : [a.answer];
+      for (const v of vals) {
+        const lower = v.toLowerCase();
+        // Detect open hem / no cuffs
+        if (lower.includes('open hem') || lower.includes('straight, uncuffed') || lower.includes('no cuffs') || lower.includes('uncuffed')) {
+          mustHave.push('open straight-cut hem at ankles');
+          mustNot.push('elastic cuffs', 'ribbed cuffs', 'tapered cuffs', 'jogger cuffs');
+        }
+        // Detect oversized/baggy
+        if (lower.includes('oversized') || lower.includes('baggy') || lower.includes('ultra baggy') || lower.includes('boxy')) {
+          mustHave.push('ultra baggy oversized wide-leg silhouette');
+        }
+        // Detect no branding/logos
+        if (lower.includes('no branding') || lower.includes('no logo') || lower.includes('no side logo')) {
+          mustNot.push('side logos', 'visible branding', 'brand patches');
+        }
+        // Detect no pockets or specific pocket style
+        if (lower.includes('side seam pockets only')) {
+          mustHave.push('side seam pockets only');
+          mustNot.push('back patch pockets', 'cargo pockets', 'front patch pockets');
+        }
+        if (lower.includes('no pockets')) {
+          mustNot.push('any visible pockets');
+        }
+        // Detect fabric composition
+        if (lower.includes('60') && lower.includes('40')) {
+          mustHave.push('60/40 cotton polyester blend fabric');
+        }
+        if (lower.includes('100% cotton')) {
+          mustHave.push('100% cotton fabric');
+        }
+        // Detect drawstring / waistband specifics
+        if (lower.includes('elastic with external drawstring') || lower.includes('drawstring')) {
+          mustHave.push('elastic waistband with external drawstring');
+        }
+        if (lower.includes('double') && lower.includes('waist')) {
+          mustHave.push('double elastic waistband');
+        }
+        // Detect full-size graphics
+        if (lower.includes('full length') || lower.includes('full size') || lower.includes('full-size')) {
+          mustHave.push('full-length large-scale graphic');
+        }
+        // Detect screen print
+        if (lower.includes('screen print')) {
+          mustHave.push('screen-printed graphic');
+        }
+      }
+    }
+  }
+
+  // Parse preferences
+  if (preferences) {
+    if (preferences.fit) {
+      const fit = preferences.fit.toLowerCase();
+      if (fit.includes('baggy') || fit.includes('oversized') || fit.includes('ultra')) {
+        mustHave.push('ultra baggy oversized fit');
+      }
+    }
+    if (preferences.hemStyle) {
+      const hem = preferences.hemStyle.toLowerCase();
+      if (hem.includes('open') || hem.includes('no cuffs') || hem.includes('straight')) {
+        mustHave.push('open straight-cut hem');
+        mustNot.push('elastic cuffs', 'ribbed cuffs');
+      }
+    }
+    if (preferences.avoid) {
+      const avoids = preferences.avoid.split(',').map(s => s.trim()).filter(Boolean);
+      mustNot.push(...avoids);
+    }
+  }
+
+  // Parse free-text instructions
+  if (typeof instructions === 'string' && instructions.trim()) {
+    const lower = instructions.toLowerCase();
+    if (lower.includes('no cuffs') || lower.includes('no cuff')) {
+      mustNot.push('cuffs of any kind');
+    }
+    if (lower.includes('no logo')) {
+      mustNot.push('logos');
+    }
+    if (lower.includes('baggy') || lower.includes('oversized')) {
+      mustHave.push('baggy oversized silhouette');
+    }
+  }
+
+  // Deduplicate
+  return {
+    mustHave: [...new Set(mustHave)],
+    mustNot: [...new Set(mustNot)],
+  };
+}
+
+// ── Validate and patch imagePrompt to enforce constraints ──
+function enforceConstraints(imagePrompt: string, mustHave: string[], mustNot: string[]): string {
+  let prompt = imagePrompt;
+  const lower = prompt.toLowerCase();
+
+  // Prepend missing MUST NOT constraints
+  const missingNots: string[] = [];
+  for (const constraint of mustNot) {
+    const keywords = constraint.toLowerCase().split(/\s+/);
+    // Check if the prompt already mentions "no <constraint>"
+    const hasNegation = lower.includes(`no ${constraint.toLowerCase()}`) ||
+      lower.includes(`without ${constraint.toLowerCase()}`) ||
+      lower.includes(`not ${constraint.toLowerCase()}`);
+    if (!hasNegation) {
+      missingNots.push(`no ${constraint}`);
+    }
+  }
+
+  // Prepend missing MUST HAVE constraints
+  const missingHaves: string[] = [];
+  for (const constraint of mustHave) {
+    const keywords = constraint.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const hasKeyword = keywords.some(kw => lower.includes(kw));
+    if (!hasKeyword) {
+      missingHaves.push(constraint);
+    }
+  }
+
+  // Inject at the front of the prompt
+  const injections: string[] = [];
+  if (missingHaves.length > 0) injections.push(missingHaves.join(', '));
+  if (missingNots.length > 0) injections.push(missingNots.join(', '));
+
+  if (injections.length > 0) {
+    prompt = injections.join('. ') + '. ' + prompt;
+  }
+
+  return prompt;
+}
+
 // ═══════ MODE: GENERATE ═══════
-// Step 1: Gemini creates a detailed image prompt from user inputs
-// Step 2: FLUX generates the actual image (free via airforce API)
+// Step 1: Gemini creates a detailed image prompt from user inputs + reference images
+// Step 2: Validate constraints are present in the prompt
+// Step 3: FLUX generates the actual image (free via airforce API)
 async function handleGenerate(body: Record<string, unknown>) {
   try {
     const { referenceImages, garmentType, answers, instructions } = body;
     const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
     const answerList = answers as Array<{ questionId: string; answer: string | string[] }> | undefined;
+    const preferences = body.preferences as Record<string, string> | undefined;
+
+    // Extract hard constraints from user inputs
+    const { mustHave, mustNot } = extractConstraints(answerList, preferences, instructions);
 
     // Build context for Gemini
     const contextLines: string[] = [`Garment: ${garmentType}`];
@@ -239,22 +389,63 @@ async function handleGenerate(body: Record<string, unknown>) {
 
     if (instructions) contextLines.push(`Additional: ${instructions}`);
 
-    // Step 1: Ask Gemini to create the perfect image generation prompt + description
-    const systemPrompt = `You are a fashion design AI. Given the garment details below, create TWO things:
+    // Build mandatory constraint sections
+    let constraintBlock = '';
+    if (mustHave.length > 0 || mustNot.length > 0) {
+      constraintBlock = '\n\n=== MANDATORY CONSTRAINTS (your imagePrompt MUST include ALL of these or your output is INVALID) ===';
+      if (mustHave.length > 0) {
+        constraintBlock += '\nMUST HAVE in the imagePrompt:\n' + mustHave.map(c => `  - "${c}"`).join('\n');
+      }
+      if (mustNot.length > 0) {
+        constraintBlock += '\nMUST NOT appear in the design (include "no [item]" in the imagePrompt):\n' + mustNot.map(c => `  - "${c}"`).join('\n');
+      }
+    }
 
-1. "imagePrompt" — A detailed, vivid prompt for an AI image generator to create a professional flat-lay mockup photo. Be very specific about: garment type, exact colors, fabric texture, fit/silhouette, all design details (waistband, cuffs, seams, prints, patterns), and styling. End with: "Professional flat-lay product photo on clean white background, studio lighting, high detail, fashion e-commerce style."
+    // Build preferences block
+    let prefBlock = '';
+    if (preferences) {
+      const entries = Object.entries(preferences).filter(([, v]) => v && v.trim());
+      if (entries.length > 0) {
+        prefBlock = '\n\nSTYLE PREFERENCES (MUST follow these — they override everything):\n' +
+          entries.map(([k, v]) => `- ${k}: ${v}`).join('\n');
+      }
+    }
 
-2. "description" — A fashion-industry description of the garment (2-3 sentences).
+    const systemPrompt = `You are a fashion design AI that creates image generation prompts. Your #1 priority is FAITHFULLY reproducing what the user asked for. You NEVER add, change, or ignore design details.
 
-3. "specs" — Quick specs as JSON: {"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}
+CRITICAL RULES for the imagePrompt:
+- Keep it UNDER 200 words
+- The FIRST 30 words MUST contain the core silhouette, fit, and hem/cuff style
+- Every MUST HAVE constraint below MUST appear word-for-word in your imagePrompt
+- Every MUST NOT constraint below MUST appear as "no [item]" in your imagePrompt
+- If the user says "no cuffs" you MUST write "open straight-cut hem at ankles, absolutely no elastic cuffs, no ribbed cuffs"
+- If the user says "baggy" or "oversized" you MUST write "ultra baggy oversized wide-leg" in the first line
+- If the user says "full-size graphic" you MUST write "large full-length graphic covering most of the leg"
+- If reference images show a specific graphic (like an AK-47), describe it exactly — don't minimize or change it
+- Do NOT add design elements the user didn't ask for (no extra pockets, logos, patterns, or embellishments)
+- Do NOT change the silhouette (if user says baggy, do NOT make it slim or tapered)
+- End with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."
+${constraintBlock}
+${prefBlock}
 
 Return ONLY valid JSON (no markdown):
-{"imagePrompt":"...","description":"...","specs":{...}}`;
+{
+  "imagePrompt": "FLUX-optimized prompt with ALL mandatory constraints included",
+  "description": "2-3 sentence fashion description matching exactly what user requested",
+  "specs": {"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}
+}`;
 
-    const data = await callGemini([{
-      role: 'user',
-      parts: [{ text: contextLines.join('\n') }],
-    }], systemPrompt);
+    // Build content parts WITH reference images (so Gemini can SEE them)
+    const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+    if (refs) {
+      for (const ref of refs.slice(0, 4)) {
+        const img = parseImage(ref.dataUrl);
+        if (img) contentParts.push({ inlineData: img });
+      }
+    }
+    contentParts.push({ text: contextLines.join('\n') });
+
+    const data = await callGemini([{ role: 'user', parts: contentParts }], systemPrompt);
 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     let imagePrompt = '';
@@ -275,7 +466,10 @@ Return ONLY valid JSON (no markdown):
       imagePrompt = `Professional flat-lay mockup of ${garmentType}. ${instructions || ''}. Clean white background, studio lighting, high detail, fashion product photo.`;
     }
 
-    // Step 2: Generate the image via FLUX
+    // Validate and enforce constraints in the generated prompt
+    imagePrompt = enforceConstraints(imagePrompt, mustHave, mustNot);
+
+    // Generate the image via FLUX
     const mockupImage = await generateImage(imagePrompt);
 
     return NextResponse.json({ mockupImage, description, garmentType, specs });
@@ -294,13 +488,52 @@ async function handleEdit(body: Record<string, unknown>) {
       return NextResponse.json({ error: 'Edit instructions are required.' }, { status: 400 });
     }
 
-    const systemPrompt = `You are editing an existing ${garmentType} design. The previous design was: "${prevDesc || 'no description'}".
+    const preferences = body.preferences as Record<string, string> | undefined;
+
+    // Extract constraints from preferences + edit instructions
+    const { mustHave, mustNot } = extractConstraints(undefined, preferences, editInstructions);
+
+    let constraintBlock = '';
+    if (mustHave.length > 0 || mustNot.length > 0) {
+      constraintBlock = '\n\n=== MANDATORY CONSTRAINTS ===';
+      if (mustHave.length > 0) {
+        constraintBlock += '\nMUST HAVE: ' + mustHave.map(c => `"${c}"`).join(', ');
+      }
+      if (mustNot.length > 0) {
+        constraintBlock += '\nMUST NOT: ' + mustNot.map(c => `"${c}"`).join(', ');
+      }
+    }
+
+    let prefBlock = '';
+    if (preferences) {
+      const entries = Object.entries(preferences).filter(([, v]) => v && v.trim());
+      if (entries.length > 0) {
+        prefBlock = '\n\nSTYLE PREFERENCES (MUST follow these — they override everything):\n' +
+          entries.map(([k, v]) => `- ${k}: ${v}`).join('\n');
+      }
+    }
+
+    const systemPrompt = `You are editing an existing ${garmentType} design for a FLUX image generation model.
+The previous design was: "${prevDesc || 'no description'}".
 The user wants to: "${editInstructions}".
 
-Create an updated image generation prompt incorporating these changes. Return ONLY valid JSON:
-{"imagePrompt":"...","description":"...","specs":{...}}
+Your #1 priority is FAITHFULLY applying the user's edit. Do NOT ignore any instruction.
 
-The imagePrompt should describe the FULL updated garment (not just the changes). End with: "Professional flat-lay product photo on clean white background, studio lighting, high detail, fashion e-commerce style."`;
+CRITICAL RULES:
+- Keep the imagePrompt UNDER 200 words
+- Put the most important structural details FIRST (silhouette, fit, hem/cuff style)
+- Be explicit about what the garment DOES and DOES NOT have
+- If user says "no cuffs" → write "open straight-cut hem, absolutely no elastic cuffs"
+- If user says "baggy" → write "ultra baggy oversized wide-leg"
+- Do NOT add elements the user didn't ask for
+- Do NOT change elements the user didn't mention changing
+${constraintBlock}
+${prefBlock}
+
+Return ONLY valid JSON:
+{"imagePrompt":"full updated garment description","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}
+
+End imagePrompt with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."`;
 
     const data = await callGemini([{
       role: 'user',
@@ -321,6 +554,9 @@ The imagePrompt should describe the FULL updated garment (not just the changes).
       imagePrompt = `Professional flat-lay mockup of ${garmentType}. ${editInstructions}. Clean white background, studio lighting, fashion e-commerce photo.`;
       description = `Applied: ${editInstructions}`;
     }
+
+    // Enforce constraints in the generated prompt
+    imagePrompt = enforceConstraints(imagePrompt, mustHave, mustNot);
 
     const mockupImage = await generateImage(imagePrompt);
 
