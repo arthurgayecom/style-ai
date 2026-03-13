@@ -20,7 +20,7 @@ export default function TechPackPage() {
   const [activeTab, setActiveTab] = useState<'measurements' | 'construction' | 'materials' | 'color' | 'labels' | 'packaging'>('measurements');
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  const mockupHistory: MockupResult[] = getItem('mockup_history', []);
+  const [mockupHistory] = useState<MockupResult[]>(() => getItem('mockup_history', []));
 
   // Auto-load design from Design Studio if available
   useEffect(() => {

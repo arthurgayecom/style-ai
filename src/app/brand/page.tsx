@@ -36,14 +36,24 @@ export default function BrandPage() {
     { key: 'hoodie', label: 'Hoodies' },
     { key: 't-shirt', label: 'Tees' },
     { key: 'shorts', label: 'Shorts' },
+    { key: 'accessories', label: 'Accessories' },
   ];
+
+  const isAccessory = (d: BrandDesign) =>
+    d.id.startsWith('AC') ||
+    /chain|d-ring|carabiner|grommet|eyelet/i.test(d.description || '') ||
+    /chain|d-ring|carabiner|grommet|eyelet/i.test(d.instructions || '');
 
   const filtered = filter === 'all'
     ? designs
-    : designs.filter(d => d.garmentType.toLowerCase().includes(filter));
+    : filter === 'accessories'
+      ? designs.filter(isAccessory)
+      : designs.filter(d => d.garmentType.toLowerCase().includes(filter));
 
   const categoryCount = (key: string) =>
-    key === 'all' ? designs.length : designs.filter(d => d.garmentType.toLowerCase().includes(key)).length;
+    key === 'all' ? designs.length
+    : key === 'accessories' ? designs.filter(isAccessory).length
+    : designs.filter(d => d.garmentType.toLowerCase().includes(key)).length;
 
   return (
     <div className="mx-auto max-w-7xl">

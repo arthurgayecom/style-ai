@@ -148,6 +148,66 @@ function parseImage(dataUrl: string) {
   return null;
 }
 
+// ── Convert canvas annotations to text descriptions for Gemini ──
+function convertAnnotationsToText(
+  annotations: Array<Record<string, unknown>> | undefined,
+  canvasHeight = 960,
+  garmentType = 'garment',
+): string {
+  if (!annotations || annotations.length === 0) return '';
+
+  const isBottom = /pant|jean|jogger|cargo|short|trouser|sweat/i.test(garmentType);
+
+  const getZone = (y: number): string => {
+    const pct = y / canvasHeight;
+    if (isBottom) {
+      if (pct < 0.12) return 'waistband area';
+      if (pct < 0.25) return 'hip/upper thigh';
+      if (pct < 0.45) return 'mid-thigh';
+      if (pct < 0.60) return 'knee area';
+      if (pct < 0.80) return 'shin/lower leg';
+      return 'ankle/hem area';
+    }
+    // Tops / jackets
+    if (pct < 0.10) return 'collar/neckline area';
+    if (pct < 0.25) return 'upper chest/shoulder';
+    if (pct < 0.45) return 'mid-chest';
+    if (pct < 0.60) return 'lower torso';
+    if (pct < 0.75) return 'waist/hem area';
+    return 'bottom edge';
+  };
+
+  const lines: string[] = [];
+  for (const ann of annotations) {
+    const tool = ann.tool as string;
+    if (tool === 'text' && ann.text) {
+      const zone = getZone(ann.y as number);
+      lines.push(`Text label "${ann.text}" placed at ${zone}`);
+    } else if (tool === 'circle' && ann.center) {
+      const c = ann.center as { x: number; y: number };
+      const zone = getZone(c.y);
+      lines.push(`Circle highlighting ${zone} — area to modify or add detail`);
+    } else if (tool === 'arrow' && ann.from && ann.to) {
+      const from = ann.from as { x: number; y: number };
+      const to = ann.to as { x: number; y: number };
+      const fromZone = getZone(from.y);
+      const toZone = getZone(to.y);
+      if (fromZone === toZone) {
+        lines.push(`Arrow pointing within ${fromZone} — indicates placement direction`);
+      } else {
+        lines.push(`Arrow from ${fromZone} to ${toZone} — element should span this area`);
+      }
+    } else if (tool === 'pen' && Array.isArray(ann.points) && ann.points.length > 0) {
+      const pts = ann.points as Array<{ x: number; y: number }>;
+      const avgY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+      const zone = getZone(avgY);
+      lines.push(`Freehand sketch in ${zone} — shows desired design element shape`);
+    }
+  }
+
+  return lines.length > 0 ? '\n\nUSER CANVAS ANNOTATIONS (drawn directly on the reference image):\n' + lines.join('\n') : '';
+}
+
 // Allow up to 60s for image generation
 export const maxDuration = 60;
 
@@ -191,13 +251,15 @@ Return ONLY valid JSON (no markdown, no code fences):
 
 Rules:
 - "type" must be: "select" (single choice), "multi-select" (multiple), or "text" (free input)
-- "category" must be: "fit", "fabric", "construction", "color", "branding", or "details"
+- "category" must be: "fit", "fabric", "construction", "color", "branding", "details", "accessories", or "graphics"
 - Questions MUST be specific to what you SEE in the reference images
 - For pants/joggers always ask about: hem style (open vs cuffed), waistband style (single vs double, drawstring vs flat), leg width, pocket placement
 - For tops always ask about: shoulder drop, sleeve length, hem length, neckline
 - Include a question about fabric weight with GSM options (Lightweight 130-160, Midweight 180-220, Heavyweight 280-320, Premium 350+)
+- Include a question about ACCESSORIES if relevant (chains, D-rings, carabiner clips, decorative zippers, grommets)
+- Include a question about GRAPHICS if relevant — placement, size, style, what the graphic depicts
 - Include a question about what to AVOID / what should NOT be on the garment
-- If reference images show specific elements (graphics, stripes, panels, patterns), ask about those EXACT elements — don't generalize
+- If reference images show specific elements (graphics, stripes, panels, patterns, chains, hardware), ask about those EXACT elements — don't generalize
 - Options must be practical streetwear terms (not generic fashion terms)
 - Always include "Ultra Baggy Wide-Leg" and "Oversized" as fit options for bottoms`;
 
@@ -323,6 +385,12 @@ function extractConstraints(
         // Detect pocket styles
         if (lower.includes('cargo pockets')) mustHave.push('cargo pockets on thighs');
         if (lower.includes('deep slant')) mustHave.push('deep slant pockets');
+        // Detect accessories
+        if (lower.includes('chain') && !lower.includes('no chain')) mustHave.push('decorative chain detail');
+        if (lower.includes('d-ring') || lower.includes('d ring')) mustHave.push('metal D-ring hardware');
+        if (lower.includes('carabiner')) mustHave.push('carabiner clip attachment');
+        if (lower.includes('decorative zipper') || lower.includes('exposed zipper')) mustHave.push('decorative exposed zipper detail');
+        if (lower.includes('grommet') || lower.includes('eyelet')) mustHave.push('metal grommet/eyelet detail');
         // Detect avoid question (questionId might be "avoid")
         if (a.questionId === 'avoid' && typeof a.answer === 'string' && a.answer.trim()) {
           const avoidItems = a.answer.split(',').map(s => s.trim()).filter(Boolean);
@@ -440,6 +508,8 @@ async function handleGenerate(body: Record<string, unknown>) {
     const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
     const answerList = answers as Array<{ questionId: string; answer: string | string[] }> | undefined;
     const preferences = body.preferences as Record<string, string> | undefined;
+    const canvasAnnotations = body.canvasAnnotations as Array<Record<string, unknown>> | undefined;
+    const canvasImage = body.canvasImage as string | undefined;
 
     // Extract hard constraints from user inputs
     const { mustHave, mustNot } = extractConstraints(answerList, preferences, instructions);
@@ -466,15 +536,19 @@ async function handleGenerate(body: Record<string, unknown>) {
 
     if (instructions) contextLines.push(`Additional: ${instructions}`);
 
+    // Add canvas annotation text
+    const annotationText = convertAnnotationsToText(canvasAnnotations, 960, garmentType as string);
+    if (annotationText) contextLines.push(annotationText);
+
     // Add explicit outfit instruction based on garment category
     const isBottom = /pant|jean|jogger|cargo|short|trouser|sweat/i.test(garmentType as string);
     const isJacket = /jacket|bomber|coat|windbreaker|parka/i.test(garmentType as string);
     if (isBottom) {
-      contextLines.push(`OUTFIT RULE: Model must wear ONLY a plain white t-shirt on top (no jacket, no hoodie, no matching top) and simple white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+      contextLines.push(`OUTFIT RULE: Model must wear ONLY a plain solid white crewneck t-shirt on top — NO hoodie, NO jacket, NO vest, NO open shirt, NO matching sweatshirt, NO graphic tee. Simple white sneakers on feet. The ${garmentType} is the ONLY product.`);
     } else if (isJacket) {
-      contextLines.push(`OUTFIT RULE: Model must wear a plain white t-shirt underneath, simple blue jeans, and white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+      contextLines.push(`OUTFIT RULE: Model must wear a plain solid white crewneck t-shirt underneath, simple blue jeans on bottom, white sneakers. The ${garmentType} is the ONLY product — NO matching pants, NO extra layers.`);
     } else {
-      contextLines.push(`OUTFIT RULE: Model must wear simple blue jeans or plain black pants on bottom and white sneakers. The ${garmentType} is the ONLY product — everything else is neutral.`);
+      contextLines.push(`OUTFIT RULE: Model must wear simple blue jeans or plain black pants on bottom and white sneakers. The ${garmentType} is the ONLY product — NO matching set, NO extra accessories.`);
     }
 
     // Build mandatory constraint sections
@@ -499,51 +573,64 @@ async function handleGenerate(body: Record<string, unknown>) {
       }
     }
 
-    const systemPrompt = `You are an expert streetwear fashion designer creating image generation prompts for FLUX AI. You deeply understand oversized/baggy aesthetics: ultra-wide legs, dropped crotch, open hems that pool on the ground, contrast waistbands, side stripe panels, heavyweight fabrics with natural drape.
+    const systemPrompt = `You are an expert streetwear fashion designer creating image generation prompts for FLUX AI. You deeply understand oversized/baggy aesthetics: ultra-wide legs, dropped crotch, open hems that pool on the ground, contrast waistbands, side stripe panels, heavyweight fabrics with natural drape. You also understand streetwear accessories: decorative chains hanging from belt loops, D-ring hardware, carabiner clips, exposed decorative zippers, and metal grommets/eyelets.
 
 Your ONLY job: faithfully translate the user's design specs + reference images into a precise FLUX image prompt. You NEVER add, change, or ignore details.
+${canvasAnnotations && canvasAnnotations.length > 0 ? '\nThe user has drawn annotations directly on their reference image. An annotated version of the image is attached. Text labels are direct instructions. Circles highlight areas to focus on. Arrows indicate placement or direction. Freehand sketches show desired element shapes. Incorporate ALL annotations into your prompt.' : ''}
 
-=== PROMPT STRUCTURE (follow this EXACT order) ===
-1. FIRST 30 WORDS: Core silhouette + fit + hem style (e.g., "ultra baggy oversized wide-leg heather grey sweatpants with open straight-cut hem pooling at ankles")
-2. NEXT: Construction details — waistband, pockets, panels, stripes, graphics
-3. NEXT: Fabric + weight + color specifics
-4. NEXT: What's NOT on the garment (every MUST NOT becomes "no [item]")
-5. NEXT: What the MODEL wears BESIDES the target garment (see OUTFIT RULES below)
-6. LAST LINE ALWAYS: "Professional fashion product photo, front-facing model, studio lighting, clean white/grey background, high-end streetwear lookbook, 8k sharp detail"
+=== PROMPT STRUCTURE — 4 LAYERS (follow this EXACT order) ===
+
+LAYER 1 — BASE (first 40 words): Garment silhouette + fit + primary fabric + primary color. This is the most important part — FLUX reads left-to-right and weighs early words most.
+Example: "Ultra baggy oversized wide-leg heather grey heavyweight French terry sweatpants with dropped crotch and open straight-cut hem pooling at ankles on a front-facing male model"
+
+LAYER 2 — OVERLAYS & ACCESSORIES (40-60 words): Chains, D-rings, carabiners, decorative zippers, double-waistband layers, contrast panels, side stripes, layered elements. Describe each accessory with exact placement ("silver curb chain hanging from right front belt loop to right back belt loop, 8-inch drop").
+
+LAYER 3 — GRAPHICS & PRINTS (40-60 words): Any graphic/print with EXACT placement, size, style, and method. Example: "AK-47 silhouette screen-printed in matte black, centered on left thigh panel, 8 inches tall, clean vector style". If no graphics requested, skip this layer entirely.
+
+LAYER 4 — CONSTRUCTION + QUALITY (40-60 words): Remaining construction details + outfit rule + quality suffix.
+Always end with: "Model wearing ONLY a plain solid white crewneck t-shirt [adjust per outfit rule] and white sneakers. Professional fashion product photo, front-facing model, natural relaxed pose, studio lighting, clean white/grey background, fabric texture clearly visible, natural skin tone, correct human anatomy, photorealistic, high-end streetwear lookbook, 8k sharp detail"
 
 === OUTFIT RULES (CRITICAL — prevents wrong items appearing) ===
-- The target garment is the ONLY featured piece. Everything else the model wears must be PLAIN and NEUTRAL so it doesn't distract or mislead.
-- If designing BOTTOMS (pants, jeans, cargos, joggers, sweats, shorts): model wears a PLAIN WHITE T-SHIRT tucked or untucked, and simple white sneakers. NO jacket, NO hoodie, NO matching set, NO accessories.
-- If designing TOPS (tee, hoodie, jacket, sweater): model wears SIMPLE BLUE JEANS or plain black pants, and simple white sneakers. NO hat, NO bag, NO extra layers.
-- If designing a JACKET: model wears a plain white tee underneath, simple blue jeans, white sneakers.
+- The target garment is the ONLY featured piece. Everything else the model wears must be PLAIN and NEUTRAL.
+- If designing BOTTOMS (pants, jeans, cargos, joggers, sweats, shorts): model wears ONLY a plain solid white crewneck t-shirt (tucked or untucked) and simple white sneakers. NO jacket, NO hoodie, NO vest, NO open shirt, NO matching sweatshirt, NO graphic tee, NO hat, NO bag.
+- If designing TOPS (tee, hoodie, sweater): model wears SIMPLE BLUE JEANS or plain black pants, and simple white sneakers. NO hat, NO bag, NO extra layers.
+- If designing a JACKET: model wears a plain solid white crewneck t-shirt underneath, simple blue jeans, white sneakers. NO matching pants.
 - NEVER generate a matching set or coordinated outfit — the viewer must instantly know which single piece is the product.
-- The model should be FRONT-FACING with a natural relaxed pose, arms slightly away from body so the garment silhouette is fully visible.
+- The model must be FRONT-FACING with a natural relaxed pose, arms slightly away from body so the garment silhouette is fully visible.
 - The garment must be shown RIGHT-SIDE FORWARD (not backwards) — front pockets, fly, waistband drawstring, and any front details must be visible.
 
 === HARD RULES ===
-- UNDER 200 words total
+- UNDER 300 words total across all 4 layers
 - If user says "no cuffs" → write "open straight-cut hem at ankles, absolutely no elastic cuffs, no ribbed cuffs, no jogger cuffs"
-- If user says "baggy/oversized" → write "ultra baggy oversized wide-leg with extreme volume" as first words
-- If user says "full-size graphic" → write "large full-length graphic covering entire leg from thigh to ankle"
-- If reference images show a specific design element (graphic, waistband, panel), describe it EXACTLY as it appears — never minimize or reinterpret
-- If user wants "same fit as reference" → study the reference closely and describe the EXACT proportions, width ratio, drop-crotch depth, and leg taper you see
+- If user says "baggy/oversized" → write "ultra baggy oversized wide-leg with extreme volume" as first words of Layer 1
+- If user says "full-size graphic" → write "large full-length graphic covering entire [area] from [top] to [bottom]" with specific placement
+- If user mentions accessories (chains, D-rings, carabiners) → describe the EXACT type, material (silver/gold/gunmetal), placement, and attachment method
+- If reference images show a specific design element, describe it EXACTLY as it appears — never minimize or reinterpret
+- If user wants "same fit as reference" → study the reference closely and describe the EXACT proportions
 - Include fabric weight when specified (e.g., "heavyweight 320 GSM French terry")
-- NEVER add elements the user didn't request (no extra pockets, logos, patterns, stripes, embellishments)
+- NEVER add elements the user didn't request
 - NEVER change the silhouette — if user says wide-leg, you CANNOT output slim, tapered, or fitted
-- NEVER show the garment backwards — always front view with all front details visible
+- NEVER show the garment backwards — always front view
 - The model must look natural and well-proportioned — no distorted limbs, no weird poses
 ${constraintBlock}
 ${prefBlock}
 
 Return ONLY valid JSON (no markdown):
 {
-  "imagePrompt": "...",
+  "imagePrompt": "Layer 1... Layer 2... Layer 3... Layer 4...",
   "description": "2-3 sentence fashion description matching EXACTLY what user requested",
   "specs": {"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}
 }`;
 
     // Build content parts WITH reference images (so Gemini can SEE them)
     const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+
+    // If annotated canvas image exists, send it first (so Gemini sees the user's drawings)
+    if (canvasImage) {
+      const annotatedImg = parseImage(canvasImage);
+      if (annotatedImg) contentParts.push({ inlineData: annotatedImg });
+    }
+
     if (refs) {
       for (const ref of refs.slice(0, 4)) {
         const img = parseImage(ref.dataUrl);
@@ -590,9 +677,11 @@ Return ONLY valid JSON (no markdown):
 async function handleEdit(body: Record<string, unknown>) {
   try {
     const { editInstructions, garmentType, description: prevDesc, mockupImage: currentImage, specs: prevSpecs } = body;
+    const canvasAnnotations = body.canvasAnnotations as Array<Record<string, unknown>> | undefined;
+    const canvasImage = body.canvasImage as string | undefined;
 
-    if (!editInstructions) {
-      return NextResponse.json({ error: 'Edit instructions are required.' }, { status: 400 });
+    if (!editInstructions && (!canvasAnnotations || canvasAnnotations.length === 0)) {
+      return NextResponse.json({ error: 'Edit instructions or canvas annotations are required.' }, { status: 400 });
     }
 
     const preferences = body.preferences as Record<string, string> | undefined;
@@ -633,36 +722,50 @@ async function handleEdit(body: Record<string, unknown>) {
       if (parts.length > 0) specsContext = '\nCurrent specs: ' + parts.join(' | ');
     }
 
-    const systemPrompt = `You are editing an existing ${garmentType} design. The attached image shows the CURRENT design. The user wants ONE specific change — NOT a redesign.
+    // Convert canvas annotations to text
+    const annotationText = convertAnnotationsToText(canvasAnnotations, 960, garmentType as string);
+
+    const systemPrompt = `You are editing an existing ${garmentType} design. The attached image shows the CURRENT design. The user wants specific changes — NOT a full redesign.
 
 CURRENT DESIGN:
 - Description: "${prevDesc || 'no description'}"${specsContext}
 
-USER'S EDIT: "${editInstructions}"
+USER'S EDIT: "${editInstructions || 'See canvas annotations below'}"
+${annotationText}
+${canvasImage ? '\nAn annotated image is attached showing the user\'s drawings on the current design. Text labels are direct edit instructions. Circles highlight areas to change. Arrows indicate direction of change. Incorporate ALL visible annotations as edits.' : ''}
 
 RULES:
 - Study the attached image carefully — that is the garment you're modifying
-- Apply ONLY the user's requested change
+- Apply ONLY the user's requested changes (text instructions + canvas annotations)
 - Keep EVERYTHING ELSE identical: same silhouette, color, fabric, graphics, fit, width, hem style, waistband, pockets, stripes
-- Your imagePrompt describes the FULL garment (current design + edit applied) ON A MODEL
+- Your imagePrompt describes the FULL garment (current design + edits applied) ON A MODEL
 - Be extremely specific about preserved elements — describe colors, materials, and construction exactly as they appear
-- Keep under 200 words
-- OUTFIT: If the garment is bottoms, model wears ONLY a plain white t-shirt and white sneakers. If tops, model wears simple blue jeans and white sneakers. NEVER add matching sets or extra layers.
+- Keep under 300 words
+- Use the 4-layer format: Layer 1 (base silhouette) → Layer 2 (overlays/accessories) → Layer 3 (graphics) → Layer 4 (construction + quality)
+- OUTFIT: If the garment is bottoms, model wears ONLY a plain solid white crewneck t-shirt and white sneakers — NO jacket, NO hoodie, NO vest, NO matching set. If tops, model wears simple blue jeans and white sneakers. NEVER add matching sets or extra layers.
 - The garment must be shown FRONT-FACING, right-side forward (not backwards). Model in natural relaxed pose.
-- End with: "Professional fashion product photo, front-facing model, studio lighting, clean white/grey background, high-end streetwear lookbook, 8k sharp detail"
+- End with: "Professional fashion product photo, front-facing model, studio lighting, clean white/grey background, fabric texture clearly visible, natural skin tone, correct human anatomy, photorealistic, high-end streetwear lookbook, 8k sharp detail"
 ${constraintBlock}
 ${prefBlock}
 
 Return ONLY valid JSON:
 {"imagePrompt":"full garment on model with edit applied, everything else exactly preserved","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}`;
 
-    // Build content parts — include the current design image so Gemini can SEE it
+    // Build content parts — include annotated canvas and/or current design image
     const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+
+    // Send annotated canvas image first if available (so Gemini sees user's drawings)
+    if (canvasImage) {
+      const annotatedImg = parseImage(canvasImage);
+      if (annotatedImg) contentParts.push({ inlineData: annotatedImg });
+    }
+
+    // Then the original current design image
     if (typeof currentImage === 'string') {
       const img = parseImage(currentImage);
       if (img) contentParts.push({ inlineData: img });
     }
-    contentParts.push({ text: `Edit request: ${editInstructions}` });
+    contentParts.push({ text: `Edit request: ${editInstructions || 'Apply the changes shown in the annotated canvas image above.'}` });
 
     const data = await callGemini([{ role: 'user', parts: contentParts }], systemPrompt);
 
@@ -704,6 +807,8 @@ function getDefaultQuestions(garmentType: string) {
       { id: 'fabric', question: 'Fabric weight?', type: 'select', options: ['Lightweight (130-160 GSM)', 'Midweight (180-220 GSM)', 'Heavyweight (280-320 GSM)', 'Premium Heavyweight (350+ GSM)'], category: 'fabric' },
       { id: 'material', question: 'Material?', type: 'select', options: ['100% Cotton Fleece', '60/40 Cotton Polyester', 'French Terry', 'Heavy Denim', 'Cotton Twill / Canvas', 'Ripstop Nylon'], category: 'fabric' },
       { id: 'pockets', question: 'Pocket style?', type: 'select', options: ['Side Seam Pockets Only', 'Deep Slant Pockets', 'Cargo Pockets on Thighs', 'No Visible Pockets'], category: 'construction' },
+      { id: 'accessories', question: 'Accessories / hardware?', type: 'multi-select', options: ['None', 'Decorative Chain (belt loop to belt loop)', 'D-Ring Hardware', 'Carabiner Clip', 'Decorative Exposed Zippers', 'Metal Grommets/Eyelets'], category: 'accessories' },
+      { id: 'graphic', question: 'Any graphic or print?', type: 'select', options: ['None (clean)', 'Small Logo on Thigh', 'Large Full-Leg Graphic', 'All-Over Print', 'Embroidered Detail'], category: 'graphics' },
       { id: 'color', question: 'Primary color?', type: 'text', category: 'color' },
       { id: 'avoid', question: 'What should this garment NOT have?', type: 'text', category: 'details' },
     ];
@@ -715,6 +820,7 @@ function getDefaultQuestions(garmentType: string) {
     { id: 'neckline', question: 'Neckline / collar?', type: 'select', options: ['Crew Neck', 'V-Neck', 'Hoodie', 'Mock Neck / Turtleneck', 'Zip-Up Collar', 'No Collar (jacket)'], category: 'construction' },
     { id: 'color', question: 'Primary color palette?', type: 'text', category: 'color' },
     { id: 'branding', question: 'Branding / graphics?', type: 'select', options: ['No Branding (clean)', 'Small Chest Logo', 'Large Front Graphic', 'Large Back Print', 'Embroidered Script', 'All-Over Pattern'], category: 'branding' },
+    { id: 'accessories', question: 'Accessories / hardware?', type: 'multi-select', options: ['None', 'Decorative Chain Detail', 'Metal D-Rings', 'Carabiner Clip', 'Decorative Zippers', 'Metal Grommets'], category: 'accessories' },
     { id: 'details', question: 'Construction details?', type: 'multi-select', options: ['Drop Shoulders', 'Extended Sleeves (covers hands)', 'Raw Edge Hem', 'Split Hem', 'Double-Needle Stitching', 'Contrast Stitching', 'Kangaroo Pocket', 'Hidden Pockets'], category: 'details' },
     { id: 'avoid', question: 'What should this garment NOT have?', type: 'text', category: 'details' },
   ];

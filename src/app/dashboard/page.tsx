@@ -48,6 +48,8 @@ const WORKFLOW_STEPS = [
 ];
 
 const CREATE_ACTIONS = [
+  { label: 'Design Studio', href: '/design', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z', desc: 'AI clothing mockups', color: 'bg-purple-500/10 text-purple-400' },
+  { label: 'VASTE Brand', href: '/brand', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', desc: 'Browse streetwear collection', color: 'bg-pink-500/10 text-pink-400' },
   { label: 'Write Essay', href: '/write', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', desc: 'Generate in your style', color: 'bg-accent-secondary/10 text-accent-secondary' },
   { label: 'Presentation', href: '/present', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z', desc: '12 styles, real images', color: 'bg-warning/10 text-warning' },
   { label: 'Brainrot Video', href: '/video', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', desc: 'TikTok-style podcast', color: 'bg-error/10 text-error' },

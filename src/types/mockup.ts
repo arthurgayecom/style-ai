@@ -18,6 +18,7 @@ export const PART_LABELS = [
   'collar', 'neckline', 'sleeves', 'hood', 'zipper',
   'body', 'lining', 'stitching', 'back panel', 'closure',
   'ribbing', 'logo placement', 'belt/chain',
+  'chain detail', 'D-ring', 'carabiner clip', 'decorative zipper', 'grommet/eyelet',
 ] as const;
 
 export type PartLabel = typeof PART_LABELS[number];
@@ -32,7 +33,7 @@ export interface ReferenceImage {
 }
 
 // ── Design Wizard Steps ──
-export type DesignStep = 'upload' | 'parts' | 'questions' | 'generate' | 'review';
+export type DesignStep = 'upload' | 'annotate' | 'parts' | 'questions' | 'generate' | 'review';
 
 // ── AI Question & Answer Flow ──
 export interface DesignQuestion {
@@ -40,7 +41,7 @@ export interface DesignQuestion {
   question: string;
   type: 'select' | 'multi-select' | 'text' | 'range';
   options?: string[];
-  category: 'fit' | 'fabric' | 'construction' | 'color' | 'branding' | 'details';
+  category: 'fit' | 'fabric' | 'construction' | 'color' | 'branding' | 'details' | 'accessories' | 'graphics';
 }
 
 export interface DesignAnswer {
@@ -196,3 +197,44 @@ export interface UserMeasurements {
   shoulders?: string;
   size?: string;
 }
+
+// ── Canvas Annotations ──
+export type CanvasToolType = 'pen' | 'text' | 'arrow' | 'circle' | 'eraser';
+
+export interface CanvasStroke {
+  id: string;
+  tool: 'pen';
+  color: string;
+  lineWidth: number;
+  points: { x: number; y: number }[];
+}
+
+export interface CanvasTextAnnotation {
+  id: string;
+  tool: 'text';
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  fontSize: number;
+}
+
+export interface CanvasArrow {
+  id: string;
+  tool: 'arrow';
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  color: string;
+  lineWidth: number;
+}
+
+export interface CanvasCircle {
+  id: string;
+  tool: 'circle';
+  center: { x: number; y: number };
+  radius: number;
+  color: string;
+  lineWidth: number;
+}
+
+export type CanvasAnnotation = CanvasStroke | CanvasTextAnnotation | CanvasArrow | CanvasCircle;

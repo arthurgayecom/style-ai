@@ -50,9 +50,26 @@ async function generateImage(prompt, width = 864, height = 1152) {
   return null;
 }
 
+// ── CLI args ──
+const args = process.argv.slice(2);
+const singleId = args.find(a => a.startsWith('--id='))?.split('=')[1]?.toUpperCase();
+const forceOverwrite = args.includes('--force');
+
 // ── Brand style prefix for consistency ──
 const BRAND_STYLE = `professional fashion product photography, studio lighting, clean white background, full garment displayed on model, high-end streetwear lookbook photo, ultra sharp detail, 8k quality`;
 const BAGGY_CORE = `ultra-baggy oversized silhouette, extremely wide legs, exaggerated volume, pooling fabric at ankles, relaxed drop-crotch`;
+
+// ── Outfit isolation rules (prevents model wearing matching/distracting items) ──
+const OUTFIT_BOTTOMS = `model wearing ONLY a plain solid white crewneck t-shirt tucked in and simple white sneakers, NO jacket NO hoodie NO vest NO matching set NO hat NO bag, front-facing natural relaxed pose`;
+const OUTFIT_TOPS = `model wearing simple blue jeans on bottom and simple white sneakers, NO matching pants NO hat NO bag, front-facing natural relaxed pose`;
+const OUTFIT_JACKETS = `model wearing plain solid white crewneck t-shirt underneath simple blue jeans and white sneakers, NO matching set, front-facing natural relaxed pose`;
+
+function getOutfitRule(garmentType) {
+  const lower = garmentType.toLowerCase();
+  if (/pant|jean|jogger|cargo|short|sweat/.test(lower)) return OUTFIT_BOTTOMS;
+  if (/jacket|bomber|coat|windbreaker|vest|parka/.test(lower)) return OUTFIT_JACKETS;
+  return OUTFIT_TOPS;
+}
 
 // ── Collection Designs ──
 const DESIGNS = [
@@ -411,6 +428,142 @@ const DESIGNS = [
     description: 'Medium wash denim ultra-baggy cutoff shorts. Raw frayed hem. Knee-length. Five-pocket rigid denim.',
     instructions: '14oz medium wash denim. Ultra-wide knee-length. Raw cutoff hem. Five-pocket. Rigid construction.',
   },
+
+  // ═══════════════════════════════════════════
+  // ACCESSORIES COLLECTION (4 designs)
+  // ═══════════════════════════════════════════
+  {
+    id: 'AC01',
+    garmentType: 'Jeans',
+    name: 'Chain Detail Wide Jeans',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, dark indigo ultra-wide-leg jeans on model, silver curb chain hanging from right front belt loop to right back belt loop with 8 inch drop, additional thin silver chain draped across left thigh from pocket to pocket, five-pocket rigid denim, open hem dragging on ground, chains are prominent decorative accessories on the jeans`,
+    description: 'Dark indigo ultra-wide jeans with silver curb chain detail — draped from belt loops and across left thigh. Rigid heavyweight denim.',
+    instructions: '15oz dark indigo rigid denim. Silver curb chain (8" drop, right belt loop to back). Thin silver chain draped left thigh. Five-pocket. Open hem.',
+  },
+  {
+    id: 'AC02',
+    garmentType: 'Cargo Pants',
+    name: 'D-Ring Utility Cargos',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, black ultra-wide cargo pants on model, gunmetal D-ring hardware attached at waistband and cargo pocket flaps, total of 6 visible D-rings, heavy cotton twill, two large cargo pockets on thighs with D-ring closure, nylon webbing belt threaded through D-rings, tactical streetwear, open hem`,
+    description: 'Black ultra-wide cargos with gunmetal D-ring hardware throughout — waistband, pockets, belt. Tactical streetwear.',
+    instructions: 'Black cotton twill, 300 GSM. 6 gunmetal D-rings (waistband + pocket flaps). Nylon webbing belt. 2 thigh cargo pockets. Open hem.',
+  },
+  {
+    id: 'AC03',
+    garmentType: 'Cargo Pants',
+    name: 'Carabiner Clip Cargos',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, olive green ultra-wide cargo pants on model, silver carabiner clips attached at belt loops and cargo pocket D-rings as decorative hardware, 4 visible carabiner clips hanging from pants, heavy cotton ripstop, large cargo pockets, webbing loops for clip attachment, military techwear look, open hem`,
+    description: 'Olive cargos with silver carabiner clip hardware — 4 clips hanging from belt loops and D-rings. Military techwear.',
+    instructions: 'Olive ripstop cotton, 280 GSM. 4 silver carabiner clips on D-ring/belt loop mounts. Large cargo pockets. Webbing loops. Open hem.',
+  },
+  {
+    id: 'AC04',
+    garmentType: 'Shorts',
+    name: 'Chain Detail Cargo Shorts',
+    prompt: `${BRAND_STYLE}, ultra-baggy black cargo shorts on model hitting below knee, extremely wide legs, silver wallet chain hanging from front belt loop to back pocket, metal grommets/eyelets along cargo pocket flaps as decorative detail, two large cargo pockets on thighs, heavy cotton twill, open hem, streetwear accessories visible`,
+    description: 'Black ultra-baggy cargo shorts with silver wallet chain and metal grommet detail on pocket flaps. Below-knee.',
+    instructions: 'Black cotton twill, 300 GSM. Below-knee ultra-wide. Silver wallet chain. Metal grommets on cargo flaps. 2 thigh pockets. Open hem.',
+  },
+
+  // ═══════════════════════════════════════════
+  // 2025-2026 TREND COLLECTION (12 designs)
+  // ═══════════════════════════════════════════
+  {
+    id: 'SW11',
+    garmentType: 'Sweatpants',
+    name: 'Pistachio Balloon Sweats',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, washed pistachio green balloon-fit sweatpants on model, extreme volume balloon silhouette, garment-dyed vintage fade finish, drawstring waist with brass aglets, deep slant pockets, open straight-cut hem, soft pastel green trending colorway`,
+    description: 'Washed pistachio green balloon-fit sweats with extreme volume. Garment-dyed vintage finish. Drawstring waist and open hem.',
+    instructions: 'Pistachio green garment-dyed fleece, 340 GSM. Extreme balloon silhouette. Deep slant pockets. Drawstring with brass aglets. Open straight-cut hem. No branding.',
+  },
+  {
+    id: 'SW12',
+    garmentType: 'Sweatpants',
+    name: 'Tech Mesh Panel Sweats',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, charcoal grey ultra-wide sweatpants on model, black mesh panel inserts at inner thigh for ventilation and techwear look, hidden zip pocket on right thigh, reflective drawstring tips, technical athletic streetwear crossover, open hem`,
+    description: 'Charcoal ultra-wide sweats with black mesh panel inserts at inner thigh. Moisture-wicking. Techwear-athletic crossover.',
+    instructions: 'Charcoal technical fleece 300 GSM. Black mesh panels inner thigh. Hidden zip pocket right thigh. Reflective drawstring tips. Open hem.',
+  },
+  {
+    id: 'JN09',
+    garmentType: 'Jeans',
+    name: 'Taupe Vintage Wide Jeans',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, washed taupe brown ultra-wide jeans on model, heavy fade at thighs and knees, earth tone vintage aesthetic, garment dyed warm brown color, five-pocket design, raw open hem, mid-rise waist, 2025 trending earth tone colorway`,
+    description: 'Washed taupe ultra-wide jeans with heavy fade at thighs and knees. Earth-tone vintage aesthetic. Five-pocket.',
+    instructions: '14oz denim, taupe garment wash. Heavy fade at thighs/knees. Wide straight leg. Five-pocket. Raw open hem. Mid-rise.',
+  },
+  {
+    id: 'JN10',
+    garmentType: 'Jeans',
+    name: 'Black Carpenter Wide Jeans',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, triple black ultra-wide carpenter jeans on model, double knee reinforcement panels, hammer loop on right side, tool pocket on left thigh, utility workwear details, heavy rigid black denim, open hem, 2025 workwear trend`,
+    description: 'Triple-black ultra-wide carpenter jeans with hammer loop, tool pocket, and reinforced double knees. Utility workwear.',
+    instructions: '15oz black rigid denim. Ultra-wide straight leg. Double knee reinforcement. Hammer loop right side. Tool pocket left thigh. Open hem.',
+  },
+  {
+    id: 'CG09',
+    garmentType: 'Cargo Pants',
+    name: 'Gorpcore Convertible Cargos',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, sage green ultra-wide convertible cargo pants on model, zip-off legs at knee showing zip detail, DWR water-resistant technical ripstop nylon fabric, 4 zip cargo pockets, elastic drawstring waist, ankle toggle hems, gorpcore outdoor streetwear fusion`,
+    description: 'Sage green DWR-coated convertible cargos with zip-off legs. Technical ripstop. Zip pockets. Outdoor-streetwear fusion.',
+    instructions: 'Sage green nylon ripstop with DWR coating. Zip-off legs at knee. 4 zip cargo pockets. Elastic drawstring waist. Toggle ankle hems.',
+  },
+  {
+    id: 'CG10',
+    garmentType: 'Cargo Pants',
+    name: 'Stone Parachute Cargos',
+    prompt: `${BRAND_STYLE}, ${BAGGY_CORE}, stone beige parachute-width cargo pants on model, extreme parachute balloon volume, lightweight nylon ripstop fabric, toggle drawstring waist, toggle ankle hems, large flap cargo pockets, elastic webbing belt, Y2K revival streetwear`,
+    description: 'Stone beige parachute-width cargos in lightweight ripstop nylon. Toggle waist and ankles. Maximum volume. Y2K revival.',
+    instructions: 'Stone beige nylon ripstop 160 GSM. Extreme parachute width. Drawstring waist + ankle toggles. Large flap cargo pockets. Elastic webbing belt.',
+  },
+  {
+    id: 'JK11',
+    garmentType: 'Jacket',
+    name: 'Slate Gorpcore Utility Vest',
+    prompt: `${BRAND_STYLE}, slate grey ripstop nylon utility vest on model, 6 pockets including 2 chest zip pockets and 2 side zip pockets, DWR water-resistant coating, standing collar, snap plus zip front closure, oversized boxy fit, gorpcore outdoor city crossover`,
+    description: 'Slate grey ripstop utility vest with 6 pockets. DWR-coated. Standing collar. Gorpcore outdoor-city crossover.',
+    instructions: 'Slate grey nylon ripstop, DWR coating. 6 pockets (2 chest zip, 2 side zip, 2 internal). Standing collar. Snap + zip front. Oversized boxy.',
+  },
+  {
+    id: 'JK12',
+    garmentType: 'Hoodie',
+    name: 'Washed Black Heavyweight Hoodie',
+    prompt: `${BRAND_STYLE}, vintage washed black heavyweight pullover hoodie on model, extremely heavy 400 GSM fleece, faded garment-dyed wash, extreme oversized drop shoulder silhouette, thick kangaroo pocket, thick natural drawstring, ribbed cuffs, minimal no branding, premium blank hoodie`,
+    description: 'Vintage washed black heavyweight pullover hoodie. 400 GSM. Faded finish. Oversized drop shoulders. Minimal.',
+    instructions: 'Washed black garment-dyed 400 GSM fleece. Extreme oversized. Dropped shoulders. Kangaroo pocket. Thick drawstring. Ribbed cuffs. No branding.',
+  },
+  {
+    id: 'TE04',
+    garmentType: 'T-Shirt',
+    name: 'Sky Blue Washed Box Tee',
+    prompt: `${BRAND_STYLE}, sky blue garment-dyed oversized boxy t-shirt on model, soft vintage wash pastel blue, dropped shoulders, split hem with longer back, thick heavy cotton fabric, trending soft pastel colorway 2025, no graphics no branding clean`,
+    description: 'Sky blue garment-dyed oversized box tee. Soft vintage wash. Dropped shoulders. Split hem. Pastel trending colorway.',
+    instructions: 'Sky blue garment-dyed 260 GSM cotton. Boxy oversized fit. Dropped shoulders. Split hem longer back. Vintage fade. No branding.',
+  },
+  {
+    id: 'TE05',
+    garmentType: 'T-Shirt',
+    name: 'Cream Gothic Print Tee',
+    prompt: `${BRAND_STYLE}, cream garment-dyed oversized t-shirt on model, large bold gothic cross graphic on front center chest, matte black screen print, distressed vintage print effect, boxy oversized fit, dropped shoulders, heavyweight cotton`,
+    description: 'Cream oversized tee with bold gothic cross graphic on front. Screen-printed matte black. Vintage washed finish.',
+    instructions: 'Cream garment-dyed 280 GSM cotton. Large gothic cross front print, matte black screen print. Boxy oversized. Dropped shoulders.',
+  },
+  {
+    id: 'SH04',
+    garmentType: 'Shorts',
+    name: 'Olive Parachute Shorts',
+    prompt: `${BRAND_STYLE}, olive green nylon parachute shorts on model, extreme wide volume, below-knee length, lightweight ripstop nylon fabric, drawstring toggle waist, cargo flap pocket on right thigh, open hem, summer techwear streetwear look`,
+    description: 'Olive nylon parachute shorts with extreme volume. Toggle waist. Below-knee. Lightweight ripstop. Summer techwear.',
+    instructions: 'Olive nylon ripstop, 160 GSM. Extreme parachute width. Below-knee. Drawstring + toggle waist. Cargo flap pocket right thigh. Open hem.',
+  },
+  {
+    id: 'SH05',
+    garmentType: 'Shorts',
+    name: 'Taupe Washed Cargo Shorts',
+    prompt: `${BRAND_STYLE}, washed taupe earth-tone cargo shorts on model, oversized below-knee length, garment-dyed vintage finish, two large cargo pockets with button flaps, heavy cotton twill fabric, drawstring waist, raw hem edge, 2025 earth tone trend`,
+    description: 'Washed taupe earth-tone cargo shorts with oversized pockets. Heavy cotton twill. Garment-dyed vintage finish.',
+    instructions: 'Taupe garment-dyed cotton twill, 280 GSM. Below-knee ultra-wide. 2 large cargo pockets with button flaps. Drawstring waist. Raw hem.',
+  },
 ];
 
 // ── Logo design ──
@@ -420,31 +573,51 @@ const LOGO_PROMPT = `minimalist premium streetwear brand logo for brand called V
 async function main() {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+  // Filter designs if --id specified
+  const designsToGen = singleId
+    ? DESIGNS.filter(d => d.id.toUpperCase() === singleId)
+    : DESIGNS;
+
+  if (singleId && designsToGen.length === 0) {
+    console.log(`Error: Design ID "${singleId}" not found. Available IDs: ${DESIGNS.map(d => d.id).join(', ')}`);
+    process.exit(1);
+  }
+
+  if (singleId) {
+    console.log(`\n═══ Regenerating single design: ${singleId} ${forceOverwrite ? '(force overwrite)' : ''} ═══\n`);
+  }
+
   const collection = [];
   let successCount = 0;
   let failCount = 0;
 
-  // Generate logo first
-  console.log('\n═══ Generating VASTE Logo ═══');
-  const logoBuf = await generateImage(LOGO_PROMPT, 1024, 512);
-  if (logoBuf) {
-    fs.writeFileSync(path.join(OUTPUT_DIR, 'logo.png'), logoBuf);
-    console.log('✓ Logo saved');
-  } else {
-    console.log('✗ Logo generation failed');
+  // Generate logo first (only in full mode)
+  if (!singleId) {
+    console.log('\n═══ Generating VASTE Logo ═══');
+    const logoBuf = await generateImage(LOGO_PROMPT, 1024, 512);
+    if (logoBuf) {
+      fs.writeFileSync(path.join(OUTPUT_DIR, 'logo.png'), logoBuf);
+      console.log('✓ Logo saved');
+    } else {
+      console.log('✗ Logo generation failed');
+    }
   }
 
-  // Generate all designs
-  console.log(`\n═══ Generating ${DESIGNS.length} VASTE Designs ═══\n`);
+  // Generate designs
+  console.log(`\n═══ Generating ${designsToGen.length} VASTE Design${designsToGen.length !== 1 ? 's' : ''} ═══\n`);
 
-  for (let i = 0; i < DESIGNS.length; i++) {
-    const design = DESIGNS[i];
+  for (let i = 0; i < designsToGen.length; i++) {
+    const design = designsToGen[i];
     const filename = `${design.id.toLowerCase()}.jpg`;
     const filepath = path.join(OUTPUT_DIR, filename);
 
-    // Skip if already generated
-    if (fs.existsSync(filepath)) {
-      console.log(`[${i + 1}/${DESIGNS.length}] ${design.name} — already exists, skipping`);
+    // Inject outfit isolation rule into prompt
+    const outfitRule = getOutfitRule(design.garmentType);
+    const fullPrompt = `${design.prompt}, ${outfitRule}`;
+
+    // Skip if already generated (unless --force)
+    if (fs.existsSync(filepath) && !forceOverwrite) {
+      console.log(`[${i + 1}/${designsToGen.length}] ${design.name} — already exists, skipping`);
       collection.push({
         id: design.id,
         garmentType: design.garmentType,
@@ -457,8 +630,8 @@ async function main() {
       continue;
     }
 
-    console.log(`[${i + 1}/${DESIGNS.length}] ${design.name} (${design.garmentType})`);
-    const buf = await generateImage(design.prompt);
+    console.log(`[${i + 1}/${designsToGen.length}] ${design.name} (${design.garmentType})`);
+    const buf = await generateImage(fullPrompt);
 
     if (buf) {
       fs.writeFileSync(filepath, buf);
@@ -478,14 +651,28 @@ async function main() {
     }
 
     // Small delay between generations to avoid hammering the API
-    if (i < DESIGNS.length - 1) {
+    if (i < designsToGen.length - 1) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
 
-  // Save collection JSON
+  // Save collection JSON — merge with existing if single regen
   const collectionPath = path.join(OUTPUT_DIR, 'collection.json');
-  fs.writeFileSync(collectionPath, JSON.stringify(collection, null, 2));
+  if (singleId) {
+    let existing = [];
+    try { existing = JSON.parse(fs.readFileSync(collectionPath, 'utf-8')); } catch { /* fresh */ }
+    // Replace matching ID or append
+    for (const newItem of collection) {
+      const idx = existing.findIndex(e => e.id === newItem.id);
+      if (idx >= 0) existing[idx] = newItem;
+      else existing.push(newItem);
+    }
+    fs.writeFileSync(collectionPath, JSON.stringify(existing, null, 2));
+    console.log(`\n═══ Done — merged into existing collection ═══`);
+  } else {
+    fs.writeFileSync(collectionPath, JSON.stringify(collection, null, 2));
+  }
+
   console.log(`\n═══ Done ═══`);
   console.log(`✓ ${successCount} designs generated`);
   console.log(`✗ ${failCount} failed`);

@@ -20,6 +20,19 @@ interface PodcastScript {
   segments: Segment[];
 }
 
+type VoiceEngine = 'browser' | 'neural' | 'generative';
+
+// Puter.js type declarations
+declare global {
+  interface Window {
+    puter?: {
+      ai: {
+        txt2speech: (text: string, options?: { voice?: string; engine?: string }) => Promise<Blob>;
+      };
+    };
+  }
+}
+
 export default function VideoPage() {
   const { providers, activeProvider } = useAIProvider();
   const [transcript, setTranscript] = useState('');
@@ -37,9 +50,23 @@ export default function VideoPage() {
   const [customUrl, setCustomUrl] = useState('');
   const [bgOpacity, setBgOpacity] = useState(40);
   const [textMode, setTextMode] = useState<'word' | 'line' | 'all'>('word');
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>('browser');
+  const [puterLoaded, setPuterLoaded] = useState(false);
+  const puterAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Load Puter.js script
+  useEffect(() => {
+    if (document.getElementById('puter-js')) { setPuterLoaded(true); return; }
+    const script = document.createElement('script');
+    script.id = 'puter-js';
+    script.src = 'https://js.puter.com/v2/';
+    script.onload = () => setPuterLoaded(true);
+    script.onerror = () => setPuterLoaded(false);
+    document.head.appendChild(script);
+  }, []);
 
   // Load transcript from localStorage
   useEffect(() => {
@@ -56,12 +83,6 @@ export default function VideoPage() {
     return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
-  const availableLanguages = [...new Map(voices.map(v => {
-    const code = v.lang.split('-')[0];
-    const names: Record<string, string> = { en: 'English', fr: 'French', es: 'Spanish', de: 'German', pt: 'Portuguese', it: 'Italian', ja: 'Japanese', ko: 'Korean', zh: 'Chinese', ar: 'Arabic', hi: 'Hindi', ru: 'Russian', nl: 'Dutch', sv: 'Swedish', tr: 'Turkish' };
-    return [code, names[code] || code.toUpperCase()];
-  })).values()].sort();
-
   const getVoiceForSpeaker = useCallback((speaker: 'A' | 'B'): SpeechSynthesisVoice | undefined => {
     const langVoices = voices.filter(v => v.lang.startsWith(language));
     const pool = langVoices.length >= 2 ? langVoices : voices.filter(v => v.lang.startsWith('en'));
@@ -69,6 +90,11 @@ export default function VideoPage() {
     if (speaker === 'A') return pool[0];
     return pool[1] || pool[0];
   }, [voices, language]);
+
+  // Puter.js voice assignments
+  const getPuterVoice = (speaker: 'A' | 'B') => {
+    return speaker === 'A' ? 'Matthew' : 'Joanna';
+  };
 
   const generateScript = async () => {
     if (!transcript.trim()) { toast.error('No transcript loaded. Go to Record page first.'); return; }
@@ -116,7 +142,8 @@ export default function VideoPage() {
     setGenerating(false);
   };
 
-  const playSegment = useCallback((segIdx: number) => {
+  // Play segment with browser speechSynthesis (fallback)
+  const playBrowserSegment = useCallback((segIdx: number) => {
     if (!script || segIdx >= script.segments.length) {
       setPlaying(false);
       return;
@@ -143,16 +170,77 @@ export default function VideoPage() {
     };
 
     utterance.onend = () => {
-      playSegment(segIdx + 1);
+      playBrowserSegment(segIdx + 1);
     };
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   }, [script, speed, getVoiceForSpeaker]);
 
+  // Play segment with Puter.js TTS
+  const playPuterSegment = useCallback(async (segIdx: number) => {
+    if (!script || segIdx >= script.segments.length) {
+      setPlaying(false);
+      return;
+    }
+
+    const seg = script.segments[segIdx];
+    setCurrentSegment(segIdx);
+    setCurrentWord(0);
+
+    try {
+      if (!window.puter?.ai?.txt2speech) throw new Error('Puter not loaded');
+
+      const blob = await window.puter.ai.txt2speech(seg.text, {
+        voice: getPuterVoice(seg.speaker),
+        engine: voiceEngine === 'generative' ? 'generative' : 'neural',
+      });
+
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.playbackRate = speed;
+      puterAudioRef.current = audio;
+
+      // Word-by-word highlight approximation (estimate word timing from audio duration)
+      const words = seg.text.split(/\s+/);
+      audio.onloadedmetadata = () => {
+        const duration = audio.duration;
+        const msPerWord = (duration / words.length) * 1000;
+        let wordIdx = 0;
+        const interval = setInterval(() => {
+          if (wordIdx < words.length) {
+            setCurrentWord(wordIdx);
+            wordIdx++;
+          } else {
+            clearInterval(interval);
+          }
+        }, msPerWord / speed);
+        audio.onended = () => {
+          clearInterval(interval);
+          URL.revokeObjectURL(url);
+          playPuterSegment(segIdx + 1);
+        };
+      };
+
+      audio.play();
+    } catch {
+      // Fallback to browser TTS
+      playBrowserSegment(segIdx);
+    }
+  }, [script, speed, voiceEngine, playBrowserSegment]);
+
+  const playSegment = useCallback((segIdx: number) => {
+    if (voiceEngine === 'browser') {
+      playBrowserSegment(segIdx);
+    } else {
+      playPuterSegment(segIdx);
+    }
+  }, [voiceEngine, playBrowserSegment, playPuterSegment]);
+
   const handlePlay = () => {
     if (playing) {
       window.speechSynthesis.cancel();
+      if (puterAudioRef.current) { puterAudioRef.current.pause(); puterAudioRef.current = null; }
       setPlaying(false);
     } else {
       setPlaying(true);
@@ -162,6 +250,7 @@ export default function VideoPage() {
 
   const handleSkip = (dir: number) => {
     window.speechSynthesis.cancel();
+    if (puterAudioRef.current) { puterAudioRef.current.pause(); puterAudioRef.current = null; }
     const next = Math.max(0, Math.min((script?.segments.length || 1) - 1, currentSegment + dir));
     setCurrentSegment(next);
     setCurrentWord(0);
@@ -169,7 +258,10 @@ export default function VideoPage() {
   };
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => {
+      window.speechSynthesis.cancel();
+      if (puterAudioRef.current) { puterAudioRef.current.pause(); puterAudioRef.current = null; }
+    };
   }, []);
 
   const currentSeg = script?.segments[currentSegment];
@@ -344,19 +436,48 @@ export default function VideoPage() {
               </div>
             </div>
 
-            {/* Language */}
+            {/* Voice Quality */}
             <div className="col-span-2 mt-2">
-              <label className="mb-1 block text-sm font-medium text-text-primary">Voice Language</label>
-              <p className="text-[10px] text-text-muted mb-1.5">Changes the text-to-speech voice (uses your browser&apos;s built-in voices)</p>
-              <div className="flex flex-wrap gap-1">
-                {[['en', 'English'], ['fr', 'French'], ['es', 'Spanish'], ['de', 'German'], ['pt', 'Portuguese'], ['it', 'Italian']].map(([code, name]) => (
-                  <button key={code} onClick={() => setLanguage(code)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${language === code ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
-                    {name}
+              <label className="mb-1 block text-sm font-medium text-text-primary">Voice Quality</label>
+              <p className="text-[10px] text-text-muted mb-1.5">
+                {voiceEngine === 'browser' ? 'Browser voices — robotic but instant' : voiceEngine === 'neural' ? 'Neural voices — natural sounding' : 'Generative voices — most human-like (may take a moment)'}
+              </p>
+              <div className="flex gap-1">
+                {([
+                  ['browser', 'Standard'] as const,
+                  ['neural', 'Neural'] as const,
+                  ['generative', 'Generative'] as const,
+                ]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setVoiceEngine(key)}
+                    disabled={key !== 'browser' && !puterLoaded}
+                    className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all ${
+                      voiceEngine === key ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover disabled:opacity-30 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    {label}
+                    {key !== 'browser' && !puterLoaded && ' (loading...)'}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Language (only for browser engine) */}
+            {voiceEngine === 'browser' && (
+              <div className="col-span-2 mt-2">
+                <label className="mb-1 block text-sm font-medium text-text-primary">Voice Language</label>
+                <p className="text-[10px] text-text-muted mb-1.5">Changes the text-to-speech voice (browser voices only)</p>
+                <div className="flex flex-wrap gap-1">
+                  {[['en', 'English'], ['fr', 'French'], ['es', 'Spanish'], ['de', 'German'], ['pt', 'Portuguese'], ['it', 'Italian']].map(([code, name]) => (
+                    <button key={code} onClick={() => setLanguage(code)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${language === code ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Text Animation */}
             <div className="col-span-2 mt-2">
@@ -422,7 +543,7 @@ export default function VideoPage() {
               {script.segments.map((seg, i) => (
                 <button
                   key={i}
-                  onClick={() => { window.speechSynthesis.cancel(); setCurrentSegment(i); setCurrentWord(0); if (playing) playSegment(i); }}
+                  onClick={() => { window.speechSynthesis.cancel(); if (puterAudioRef.current) { puterAudioRef.current.pause(); puterAudioRef.current = null; } setCurrentSegment(i); setCurrentWord(0); if (playing) playSegment(i); }}
                   className={`w-full rounded-lg p-3 text-left text-sm transition-all ${
                     i === currentSegment ? 'border border-accent bg-accent/5' : 'border border-transparent hover:bg-bg-hover'
                   }`}

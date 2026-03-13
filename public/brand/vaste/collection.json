@@ -302,5 +302,133 @@
     "image": "/brand/vaste/sh03.jpg",
     "description": "Medium wash denim ultra-baggy cutoff shorts. Raw frayed hem. Knee-length. Five-pocket rigid denim.",
     "instructions": "14oz medium wash denim. Ultra-wide knee-length. Raw cutoff hem. Five-pocket. Rigid construction."
+  },
+  {
+    "id": "AC01",
+    "garmentType": "Jeans",
+    "name": "Chain Detail Wide Jeans",
+    "image": "/brand/vaste/ac01.jpg",
+    "description": "Dark indigo ultra-wide jeans with silver curb chain detail — draped from belt loops and across left thigh. Rigid heavyweight denim.",
+    "instructions": "15oz dark indigo rigid denim. Silver curb chain (8\" drop, right belt loop to back). Thin silver chain draped left thigh. Five-pocket. Open hem."
+  },
+  {
+    "id": "AC02",
+    "garmentType": "Cargo Pants",
+    "name": "D-Ring Utility Cargos",
+    "image": "/brand/vaste/ac02.jpg",
+    "description": "Black ultra-wide cargos with gunmetal D-ring hardware throughout — waistband, pockets, belt. Tactical streetwear.",
+    "instructions": "Black cotton twill, 300 GSM. 6 gunmetal D-rings (waistband + pocket flaps). Nylon webbing belt. 2 thigh cargo pockets. Open hem."
+  },
+  {
+    "id": "AC03",
+    "garmentType": "Cargo Pants",
+    "name": "Carabiner Clip Cargos",
+    "image": "/brand/vaste/ac03.jpg",
+    "description": "Olive cargos with silver carabiner clip hardware — 4 clips hanging from belt loops and D-rings. Military techwear.",
+    "instructions": "Olive ripstop cotton, 280 GSM. 4 silver carabiner clips on D-ring/belt loop mounts. Large cargo pockets. Webbing loops. Open hem."
+  },
+  {
+    "id": "AC04",
+    "garmentType": "Shorts",
+    "name": "Chain Detail Cargo Shorts",
+    "image": "/brand/vaste/ac04.jpg",
+    "description": "Black ultra-baggy cargo shorts with silver wallet chain and metal grommet detail on pocket flaps. Below-knee.",
+    "instructions": "Black cotton twill, 300 GSM. Below-knee ultra-wide. Silver wallet chain. Metal grommets on cargo flaps. 2 thigh pockets. Open hem."
+  },
+  {
+    "id": "SW11",
+    "garmentType": "Sweatpants",
+    "name": "Pistachio Balloon Sweats",
+    "image": "/brand/vaste/sw11.jpg",
+    "description": "Washed pistachio green balloon-fit sweats with extreme volume. Garment-dyed vintage finish. Drawstring waist and open hem.",
+    "instructions": "Pistachio green garment-dyed fleece, 340 GSM. Extreme balloon silhouette. Deep slant pockets. Drawstring with brass aglets. Open straight-cut hem. No branding."
+  },
+  {
+    "id": "SW12",
+    "garmentType": "Sweatpants",
+    "name": "Tech Mesh Panel Sweats",
+    "image": "/brand/vaste/sw12.jpg",
+    "description": "Charcoal ultra-wide sweats with black mesh panel inserts at inner thigh. Moisture-wicking. Techwear-athletic crossover.",
+    "instructions": "Charcoal technical fleece 300 GSM. Black mesh panels inner thigh. Hidden zip pocket right thigh. Reflective drawstring tips. Open hem."
+  },
+  {
+    "id": "JN09",
+    "garmentType": "Jeans",
+    "name": "Taupe Vintage Wide Jeans",
+    "image": "/brand/vaste/jn09.jpg",
+    "description": "Washed taupe ultra-wide jeans with heavy fade at thighs and knees. Earth-tone vintage aesthetic. Five-pocket.",
+    "instructions": "14oz denim, taupe garment wash. Heavy fade at thighs/knees. Wide straight leg. Five-pocket. Raw open hem. Mid-rise."
+  },
+  {
+    "id": "JN10",
+    "garmentType": "Jeans",
+    "name": "Black Carpenter Wide Jeans",
+    "image": "/brand/vaste/jn10.jpg",
+    "description": "Triple-black ultra-wide carpenter jeans with hammer loop, tool pocket, and reinforced double knees. Utility workwear.",
+    "instructions": "15oz black rigid denim. Ultra-wide straight leg. Double knee reinforcement. Hammer loop right side. Tool pocket left thigh. Open hem."
+  },
+  {
+    "id": "CG09",
+    "garmentType": "Cargo Pants",
+    "name": "Gorpcore Convertible Cargos",
+    "image": "/brand/vaste/cg09.jpg",
+    "description": "Sage green DWR-coated convertible cargos with zip-off legs. Technical ripstop. Zip pockets. Outdoor-streetwear fusion.",
+    "instructions": "Sage green nylon ripstop with DWR coating. Zip-off legs at knee. 4 zip cargo pockets. Elastic drawstring waist. Toggle ankle hems."
+  },
+  {
+    "id": "CG10",
+    "garmentType": "Cargo Pants",
+    "name": "Stone Parachute Cargos",
+    "image": "/brand/vaste/cg10.jpg",
+    "description": "Stone beige parachute-width cargos in lightweight ripstop nylon. Toggle waist and ankles. Maximum volume. Y2K revival.",
+    "instructions": "Stone beige nylon ripstop 160 GSM. Extreme parachute width. Drawstring waist + ankle toggles. Large flap cargo pockets. Elastic webbing belt."
+  },
+  {
+    "id": "JK11",
+    "garmentType": "Jacket",
+    "name": "Slate Gorpcore Utility Vest",
+    "image": "/brand/vaste/jk11.jpg",
+    "description": "Slate grey ripstop utility vest with 6 pockets. DWR-coated. Standing collar. Gorpcore outdoor-city crossover.",
+    "instructions": "Slate grey nylon ripstop, DWR coating. 6 pockets (2 chest zip, 2 side zip, 2 internal). Standing collar. Snap + zip front. Oversized boxy."
+  },
+  {
+    "id": "JK12",
+    "garmentType": "Hoodie",
+    "name": "Washed Black Heavyweight Hoodie",
+    "image": "/brand/vaste/jk12.jpg",
+    "description": "Vintage washed black heavyweight pullover hoodie. 400 GSM. Faded finish. Oversized drop shoulders. Minimal.",
+    "instructions": "Washed black garment-dyed 400 GSM fleece. Extreme oversized. Dropped shoulders. Kangaroo pocket. Thick drawstring. Ribbed cuffs. No branding."
+  },
+  {
+    "id": "TE04",
+    "garmentType": "T-Shirt",
+    "name": "Sky Blue Washed Box Tee",
+    "image": "/brand/vaste/te04.jpg",
+    "description": "Sky blue garment-dyed oversized box tee. Soft vintage wash. Dropped shoulders. Split hem. Pastel trending colorway.",
+    "instructions": "Sky blue garment-dyed 260 GSM cotton. Boxy oversized fit. Dropped shoulders. Split hem longer back. Vintage fade. No branding."
+  },
+  {
+    "id": "TE05",
+    "garmentType": "T-Shirt",
+    "name": "Cream Gothic Print Tee",
+    "image": "/brand/vaste/te05.jpg",
+    "description": "Cream oversized tee with bold gothic cross graphic on front. Screen-printed matte black. Vintage washed finish.",
+    "instructions": "Cream garment-dyed 280 GSM cotton. Large gothic cross front print, matte black screen print. Boxy oversized. Dropped shoulders."
+  },
+  {
+    "id": "SH04",
+    "garmentType": "Shorts",
+    "name": "Olive Parachute Shorts",
+    "image": "/brand/vaste/sh04.jpg",
+    "description": "Olive nylon parachute shorts with extreme volume. Toggle waist. Below-knee. Lightweight ripstop. Summer techwear.",
+    "instructions": "Olive nylon ripstop, 160 GSM. Extreme parachute width. Below-knee. Drawstring + toggle waist. Cargo flap pocket right thigh. Open hem."
+  },
+  {
+    "id": "SH05",
+    "garmentType": "Shorts",
+    "name": "Taupe Washed Cargo Shorts",
+    "image": "/brand/vaste/sh05.jpg",
+    "description": "Washed taupe earth-tone cargo shorts with oversized pockets. Heavy cotton twill. Garment-dyed vintage finish.",
+    "instructions": "Taupe garment-dyed cotton twill, 280 GSM. Below-knee ultra-wide. 2 large cargo pockets with button flaps. Drawstring waist. Raw hem."
   }
 ]

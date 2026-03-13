@@ -3,14 +3,16 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GARMENT_TYPES, PART_LABELS } from '@/types/mockup';
-import type { ReferenceImage, PartLabel, DesignQuestion, DesignAnswer, MockupResult, DesignStep } from '@/types/mockup';
+import type { ReferenceImage, PartLabel, DesignQuestion, DesignAnswer, MockupResult, DesignStep, CanvasAnnotation } from '@/types/mockup';
 import { getItem, setItem } from '@/lib/storage/localStorage';
+import DesignCanvas from '@/components/canvas/DesignCanvas';
 
 const MAX_IMAGES = 6;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const STEPS: { key: DesignStep; label: string }[] = [
   { key: 'upload', label: 'References' },
+  { key: 'annotate', label: 'Annotate' },
   { key: 'parts', label: 'Pick Parts' },
   { key: 'questions', label: 'Details' },
   { key: 'generate', label: 'Generate' },
@@ -64,6 +66,13 @@ export default function DesignPage() {
   // Step 5: Review & Edit
   const [editText, setEditText] = useState('');
   const [editing, setEditing] = useState(false);
+
+  // Canvas annotations
+  const [preGenAnnotations, setPreGenAnnotations] = useState<CanvasAnnotation[]>([]);
+  const [preGenCanvasImage, setPreGenCanvasImage] = useState<string>('');
+  const [postGenAnnotations, setPostGenAnnotations] = useState<CanvasAnnotation[]>([]);
+  const [postGenCanvasImage, setPostGenCanvasImage] = useState<string>('');
+  const [showPostGenCanvas, setShowPostGenCanvas] = useState(false);
 
   // Shared
   const [error, setError] = useState('');
@@ -206,6 +215,8 @@ export default function DesignPage() {
           instructions: extraInstructions,
           quality: 'high',
           preferences: Object.keys(activePrefs).length > 0 ? activePrefs : undefined,
+          canvasAnnotations: preGenAnnotations.length > 0 ? preGenAnnotations : undefined,
+          canvasImage: preGenCanvasImage || undefined,
         }),
       });
       const data = await res.json();
@@ -235,7 +246,7 @@ export default function DesignPage() {
 
   // ── Step 5: Edit / Remix ──
   const handleEdit = async () => {
-    if (!editText.trim() || !result?.mockupImage) return;
+    if ((!editText.trim() && postGenAnnotations.length === 0) || !result?.mockupImage) return;
     setEditing(true);
     setError('');
 
@@ -243,17 +254,31 @@ export default function DesignPage() {
       const activePrefs = Object.fromEntries(
         Object.entries(preferences).filter(([, v]) => v && v.trim())
       );
+      // Build edit instructions from text + canvas annotations
+      let fullEditInstructions = editText.trim();
+      if (postGenAnnotations.length > 0) {
+        const textLabels = postGenAnnotations
+          .filter(a => a.tool === 'text')
+          .map(a => (a as CanvasAnnotation & { text: string }).text)
+          .filter(Boolean);
+        if (textLabels.length > 0 && !fullEditInstructions) {
+          fullEditInstructions = textLabels.join('. ');
+        }
+      }
+
       const res = await fetch('/api/ai/mockup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'edit',
           mockupImage: result.mockupImage,
-          editInstructions: editText,
+          editInstructions: fullEditInstructions,
           garmentType,
           description: result.description,
           specs: result.specs,
           preferences: Object.keys(activePrefs).length > 0 ? activePrefs : undefined,
+          canvasAnnotations: postGenAnnotations.length > 0 ? postGenAnnotations : undefined,
+          canvasImage: postGenCanvasImage || undefined,
         }),
       });
       const data = await res.json();
@@ -284,19 +309,22 @@ export default function DesignPage() {
   const stepIndex = STEPS.findIndex(s => s.key === step);
   const canNext = () => {
     if (step === 'upload') return references.length > 0;
+    if (step === 'annotate') return true; // annotate is optional
     if (step === 'parts') return true;
     if (step === 'questions') return true;
     return false;
   };
 
   const goNext = () => {
-    if (step === 'upload') setStep('parts');
+    if (step === 'upload') setStep('annotate');
+    else if (step === 'annotate') setStep('parts');
     else if (step === 'parts') { setStep('questions'); if (questions.length === 0) generateQuestions(); }
     else if (step === 'questions') { setStep('generate'); handleGenerate(); }
   };
 
   const goBack = () => {
-    if (step === 'parts') setStep('upload');
+    if (step === 'annotate') setStep('upload');
+    else if (step === 'parts') setStep('annotate');
     else if (step === 'questions') setStep('parts');
     else if (step === 'generate') setStep('questions');
     else if (step === 'review') setStep('questions');
@@ -533,6 +561,62 @@ export default function DesignPage() {
           </motion.div>
         )}
 
+        {/* ═══════ STEP 1.5: ANNOTATE (optional) ═══════ */}
+        {step === 'annotate' && (
+          <motion.div key="annotate" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+            <div className="rounded-2xl border border-border bg-bg-card p-6">
+              <h2 className="mb-1 text-lg font-bold text-text-primary">Annotate Your Reference</h2>
+              <p className="mb-3 text-sm text-text-muted">
+                Draw on your reference image to show exactly where you want things. Use text labels for instructions like &quot;pocket here&quot; or &quot;chain from here to here&quot;.
+                <span className="text-purple-400 font-medium"> This step is optional — skip if not needed.</span>
+              </p>
+
+              {references.length > 1 && (
+                <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                  {references.map((ref, i) => (
+                    <button
+                      key={ref.id}
+                      onClick={() => {
+                        // Move selected ref to front for annotation
+                        setReferences(prev => {
+                          const arr = [...prev];
+                          const [selected] = arr.splice(i, 1);
+                          arr.unshift(selected);
+                          return arr;
+                        });
+                        setPreGenAnnotations([]);
+                        setPreGenCanvasImage('');
+                      }}
+                      className={`shrink-0 rounded-lg border overflow-hidden ${
+                        i === 0 ? 'border-purple-500/50 ring-2 ring-purple-500/20' : 'border-border hover:border-border/80'
+                      }`}
+                    >
+                      <img src={ref.dataUrl} alt={ref.filename} className="h-14 w-14 object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <DesignCanvas
+                backgroundImage={references[0]?.dataUrl}
+                mode="annotate"
+                onAnnotationsChange={setPreGenAnnotations}
+                onExportImage={setPreGenCanvasImage}
+              />
+
+              {preGenAnnotations.length > 0 && (
+                <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">Your annotations will be sent to the AI</p>
+                  <p className="text-xs text-text-muted">
+                    The AI will see your drawings and text labels when generating. Text labels become direct instructions.
+                    Circles highlight areas. Arrows show direction/placement.
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* ═══════ STEP 2: PICK PARTS ═══════ */}
         {step === 'parts' && (
           <motion.div key="parts" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
@@ -624,6 +708,8 @@ export default function DesignPage() {
                             q.category === 'construction' ? 'bg-green-500/20 text-green-400' :
                             q.category === 'color' ? 'bg-pink-500/20 text-pink-400' :
                             q.category === 'branding' ? 'bg-cyan-500/20 text-cyan-400' :
+                            q.category === 'accessories' ? 'bg-orange-500/20 text-orange-400' :
+                            q.category === 'graphics' ? 'bg-rose-500/20 text-rose-400' :
                             'bg-purple-500/20 text-purple-400'
                           }`}>{q.category}</span>
                         </div>
@@ -703,18 +789,38 @@ export default function DesignPage() {
         )}
 
         {/* ═══════ STEP 4: GENERATING ═══════ */}
-        {step === 'generate' && generating && (
+        {step === 'generate' && (
           <motion.div key="generate" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="flex flex-col items-center justify-center py-24">
-              <div className="relative mb-6">
-                <div className="h-20 w-20 rounded-full border-4 border-purple-500/20" />
-                <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-purple-500" style={{ animationDuration: '1.5s' }} />
-                <div className="absolute inset-2 h-16 w-16 animate-spin rounded-full border-4 border-transparent border-b-pink-500" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+            {generating ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="relative mb-6">
+                  <div className="h-20 w-20 rounded-full border-4 border-purple-500/20" />
+                  <div className="absolute inset-0 h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-purple-500" style={{ animationDuration: '1.5s' }} />
+                  <div className="absolute inset-2 h-16 w-16 animate-spin rounded-full border-4 border-transparent border-b-pink-500" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+                </div>
+                <h2 className="text-xl font-bold text-text-primary mb-2">Creating Your Design</h2>
+                <p className="text-sm text-text-muted mb-1">AI is combining your references and specifications...</p>
+                <p className="text-xs text-text-muted/60">This usually takes 15-30 seconds</p>
               </div>
-              <h2 className="text-xl font-bold text-text-primary mb-2">Creating Your Design</h2>
-              <p className="text-sm text-text-muted mb-1">AI is combining your references and specifications...</p>
-              <p className="text-xs text-text-muted/60">This usually takes 15-30 seconds</p>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-text-primary mb-2">Generation Failed</h2>
+                <p className="text-sm text-text-muted mb-4">{error || 'Something went wrong. Please try again.'}</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setStep('questions')} className="rounded-lg border border-border px-4 py-2 text-sm text-text-muted hover:bg-bg-hover transition-colors">
+                    Go Back
+                  </button>
+                  <button onClick={() => { setError(''); handleGenerate(); }} className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500 transition-colors">
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -766,6 +872,68 @@ export default function DesignPage() {
 
               {/* Edit Panel */}
               <div className="space-y-4">
+                {/* Draw on Image Toggle */}
+                <div className="rounded-2xl border border-border bg-bg-card p-5">
+                  <button
+                    onClick={() => { setShowPostGenCanvas(!showPostGenCanvas); if (showPostGenCanvas) { setPostGenAnnotations([]); setPostGenCanvasImage(''); } }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs font-bold transition-all ${
+                      showPostGenCanvas
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+                        : 'border border-border text-text-muted hover:bg-bg-hover hover:text-text-secondary'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Draw on Image
+                    </span>
+                    <span className="text-[10px] font-normal">{showPostGenCanvas ? 'Close' : 'Open'}</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {showPostGenCanvas && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3">
+                          <p className="text-[10px] text-text-muted mb-2">
+                            Draw on the result to show the AI exactly what to change. Use text labels like &quot;remove this&quot; or &quot;make wider here&quot;.
+                          </p>
+                          <DesignCanvas
+                            backgroundImage={result.mockupImage}
+                            mode="edit"
+                            onAnnotationsChange={setPostGenAnnotations}
+                            onExportImage={setPostGenCanvasImage}
+                          />
+                          {postGenAnnotations.length > 0 && (
+                            <button
+                              onClick={() => {
+                                // Auto-fill edit text from text annotations
+                                const textLabels = postGenAnnotations
+                                  .filter(a => a.tool === 'text')
+                                  .map(a => ('text' in a ? a.text : ''))
+                                  .filter(Boolean);
+                                const circleCount = postGenAnnotations.filter(a => a.tool === 'circle').length;
+                                const parts: string[] = [];
+                                if (textLabels.length > 0) parts.push(textLabels.join('. '));
+                                if (circleCount > 0) parts.push(`${circleCount} circled area${circleCount > 1 ? 's' : ''} to modify`);
+                                if (parts.length > 0) setEditText(parts.join('. '));
+                              }}
+                              className="mt-2 w-full rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[10px] font-semibold text-purple-400 hover:bg-purple-500/20 transition-colors"
+                            >
+                              Use Annotations as Edit Instructions
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <div className="rounded-2xl border border-border bg-bg-card p-5">
                   <h3 className="text-sm font-bold text-text-primary mb-3">Edit Your Design</h3>
                   <p className="text-xs text-text-muted mb-3">Tell the AI what to change. Be specific!</p>
@@ -778,7 +946,7 @@ export default function DesignPage() {
                   />
                   <button
                     onClick={handleEdit}
-                    disabled={editing || !editText.trim()}
+                    disabled={editing || (!editText.trim() && postGenAnnotations.length === 0)}
                     className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {editing ? (
@@ -786,7 +954,7 @@ export default function DesignPage() {
                         <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                         Applying Changes...
                       </span>
-                    ) : 'Apply Changes'}
+                    ) : postGenAnnotations.length > 0 && !editText.trim() ? 'Apply Canvas Annotations' : 'Apply Changes'}
                   </button>
                 </div>
 
@@ -915,7 +1083,7 @@ export default function DesignPage() {
                 </div>
 
                 <button
-                  onClick={() => { setStep('upload'); setResult(null); setQuestions([]); setAnswers([]); }}
+                  onClick={() => { setStep('upload'); setResult(null); setQuestions([]); setAnswers([]); setPreGenAnnotations([]); setPreGenCanvasImage(''); setPostGenAnnotations([]); setPostGenCanvasImage(''); setShowPostGenCanvas(false); }}
                   className="w-full rounded-lg border border-border px-3 py-2 text-xs text-text-muted hover:bg-bg-hover transition-colors"
                 >
                   Start New Design

@@ -113,7 +113,8 @@ export default function RecordPage() {
         }
       };
       recognition.onend = () => {
-        if (isRecording && recognitionRef.current) {
+        // Use ref check instead of isRecording state to avoid stale closure
+        if (recognitionRef.current) {
           try { recognitionRef.current.start(); } catch { /* ignore */ }
         }
       };
