@@ -124,21 +124,15 @@ export async function exportAsPPTX({
         slide.addText(s.title, { x: 0.8, y: 0.5, w: 11.5, h: 1, fontSize: 28, fontFace: 'Arial', bold: true, color: '333333' });
         if (bullets.length > 0) {
           const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
-          slide.addText(bulletText, { x: 0.8, y: 1.8, w: s.imageDescription ? 7 : 11.5, h: 5, fontFace: 'Arial', valign: 'top' });
-        }
-        if (s.imageUrl) {
-          try {
-            slide.addImage({ path: s.imageUrl, x: 8.5, y: 1.8, w: 4, h: 4, rounding: true });
-          } catch { /* skip image on failure */ }
+          slide.addText(bulletText, { x: 0.8, y: 1.8, w: 11.5, h: 5, fontFace: 'Arial', valign: 'top' });
         }
         break;
 
       case 'image_text':
         slide.addText(s.title, { x: 0.8, y: 0.5, w: 11.5, h: 1, fontSize: 28, fontFace: 'Arial', bold: true, color: '333333' });
-        if (s.imageUrl) {
-          try {
-            slide.addImage({ path: s.imageUrl, x: 0.8, y: 1.8, w: 5.5, h: 4.5, rounding: true });
-          } catch { /* skip */ }
+        if (s.imageDescription) {
+          slide.addShape(pptx.ShapeType.roundRect, { x: 0.8, y: 1.8, w: 5.5, h: 4.5, fill: { color: 'F0F0F0' }, rectRadius: 0.15 });
+          slide.addText(s.imageDescription, { x: 1.1, y: 3.2, w: 5, h: 1, fontSize: 11, fontFace: 'Arial', color: '999999', align: 'center', valign: 'middle' });
         }
         if (bullets.length > 0) {
           const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 16, color: '555555', breakLine: true } }));
@@ -153,10 +147,9 @@ export async function exportAsPPTX({
           const bulletText = bullets.map(b => ({ text: b, options: { bullet: { type: 'bullet' as const }, fontSize: 14, color: 'FFFFFF', breakLine: true } }));
           slide.addText(bulletText, { x: 0.5, y: 2.2, w: 5.5, h: 4.5, fontFace: 'Arial', valign: 'top' });
         }
-        if (s.imageUrl) {
-          try {
-            slide.addImage({ path: s.imageUrl, x: 6.5, y: 0, w: 6.84, h: 7.5 });
-          } catch { /* skip */ }
+        if (s.imageDescription) {
+          slide.addShape(pptx.ShapeType.roundRect, { x: 6.5, y: 0, w: 6.84, h: 7.5, fill: { color: 'F0F0F0' }, rectRadius: 0 });
+          slide.addText(s.imageDescription, { x: 7, y: 3, w: 5.8, h: 1.5, fontSize: 12, fontFace: 'Arial', color: '999999', align: 'center', valign: 'middle' });
         }
         break;
 
@@ -304,18 +297,10 @@ export async function exportAsPPTX({
         break;
 
       case 'full_image':
-        if (s.imageUrl) {
-          try {
-            slide.addImage({ path: s.imageUrl, x: 0, y: 0, w: 13.34, h: 7.5, sizing: { type: 'cover', w: 13.34, h: 7.5 } });
-          } catch { /* skip */ }
-        }
-        slide.addShape(pptx.ShapeType.rect, {
-          x: 0, y: 4, w: 13.34, h: 3.5,
-          fill: { color: '000000', transparency: 40 },
-        });
-        slide.addText(s.title, { x: 0.8, y: 4.5, w: 11, h: 1.2, fontSize: 32, fontFace: 'Arial', bold: true, color: 'FFFFFF' });
+        slide.background = { color: c1 };
+        slide.addText(s.title, { x: 0.8, y: 2.5, w: 11.5, h: 1.5, fontSize: 36, fontFace: 'Arial', bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
         if (s.overlayText || bullets[0]) {
-          slide.addText(s.overlayText || bullets[0], { x: 0.8, y: 5.7, w: 11, h: 0.8, fontSize: 16, fontFace: 'Arial', color: 'FFFFFF', transparency: 30 });
+          slide.addText(s.overlayText || bullets[0], { x: 0.8, y: 4.2, w: 11.5, h: 1, fontSize: 18, fontFace: 'Arial', color: 'FFFFFF', align: 'center', transparency: 30 });
         }
         break;
 

@@ -192,23 +192,44 @@ export default function VideoPage() {
         <div className="mx-auto max-w-lg space-y-4">
           <div className="rounded-xl border border-border bg-bg-card p-5" style={{ boxShadow: 'var(--card-shadow)' }}>
             <h2 className="mb-2 text-sm font-semibold text-text-primary">Lesson Content</h2>
+            <p className="mb-2 text-xs text-text-muted">Paste your lesson transcript, notes, or any study material. The AI will turn it into a 2-person podcast conversation.</p>
             <textarea
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
-              placeholder="Paste your lesson transcript or go to Record page to capture one..."
+              placeholder="Paste your lesson transcript, notes, or study material here..."
               rows={8}
               className="w-full rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring resize-none"
             />
-            {transcript && <p className="mt-1 text-xs text-text-muted">{transcript.split(/\s+/).filter(Boolean).length} words</p>}
+            {transcript && (
+              <div className="mt-2 rounded-lg bg-bg-secondary p-3 border border-border">
+                <p className="text-xs text-text-muted">{transcript.split(/\s+/).filter(Boolean).length} words</p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Preview: {transcript.slice(0, 200).trim()}{transcript.length > 200 ? '...' : ''}
+                </p>
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={generateScript}
-            disabled={generating || !transcript.trim()}
-            className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
-          >
-            {generating ? 'Generating Podcast Script...' : 'Generate Podcast'}
-          </button>
+          {transcript.trim() && (
+            <div className="rounded-xl border border-accent/20 bg-accent/5 p-4">
+              <h3 className="text-sm font-semibold text-text-primary mb-1">Ready to generate?</h3>
+              <p className="text-xs text-text-muted mb-3">This will create a TikTok-style 2-person podcast (Alex & Sam) from your content. Uses your AI provider.</p>
+              <button
+                onClick={generateScript}
+                disabled={generating}
+                className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-40"
+              >
+                {generating ? 'Generating Podcast Script...' : 'Generate Podcast Script'}
+              </button>
+            </div>
+          )}
+
+          {!transcript.trim() && (
+            <div className="rounded-xl border border-dashed border-border p-6 text-center">
+              <p className="text-sm text-text-muted">Paste or type your lesson content above to get started</p>
+              <p className="mt-1 text-xs text-text-muted">Or go to the Record page to capture a lecture first</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -326,8 +347,9 @@ export default function VideoPage() {
             {/* Language */}
             <div className="col-span-2 mt-2">
               <label className="mb-1 block text-sm font-medium text-text-primary">Voice Language</label>
+              <p className="text-[10px] text-text-muted mb-1.5">Changes the text-to-speech voice (uses your browser&apos;s built-in voices)</p>
               <div className="flex flex-wrap gap-1">
-                {availableLanguages.map(([code, name]) => (
+                {[['en', 'English'], ['fr', 'French'], ['es', 'Spanish'], ['de', 'German'], ['pt', 'Portuguese'], ['it', 'Italian']].map(([code, name]) => (
                   <button key={code} onClick={() => setLanguage(code)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${language === code ? 'bg-accent text-white' : 'border border-border text-text-secondary hover:bg-bg-hover'}`}>
                     {name}

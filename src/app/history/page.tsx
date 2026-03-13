@@ -6,8 +6,9 @@ import { getItem, setItem } from '@/lib/storage/localStorage';
 import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
 import { toast } from 'sonner';
 import type { GeneratedEssay } from '@/types/essay';
+import type { MockupResult } from '@/types/mockup';
 
-type Tab = 'essays' | 'presentations';
+type Tab = 'designs' | 'essays' | 'presentations';
 
 interface SavedPresentation {
   id: string;
@@ -19,15 +20,18 @@ interface SavedPresentation {
 }
 
 export default function HistoryPage() {
-  const [tab, setTab] = useState<Tab>('essays');
+  const [tab, setTab] = useState<Tab>('designs');
   const [essays, setEssays] = useState<GeneratedEssay[]>([]);
   const [presentations, setPresentations] = useState<SavedPresentation[]>([]);
+  const [designs, setDesigns] = useState<MockupResult[]>([]);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedDesign, setSelectedDesign] = useState<MockupResult | null>(null);
 
   useEffect(() => {
     setEssays(getItem<GeneratedEssay[]>('generated_essays', []));
     setPresentations(getItem<SavedPresentation[]>('generated_presentations', []));
+    setDesigns(getItem<MockupResult[]>('mockup_history', []));
   }, []);
 
   const deleteEssay = (id: string) => {
@@ -46,6 +50,32 @@ export default function HistoryPage() {
     toast('Presentation deleted');
   };
 
+  const deleteDesign = (id: string) => {
+    if (!confirm('Delete this design? This cannot be undone.')) return;
+    const updated = designs.filter(d => d.id !== id);
+    setDesigns(updated);
+    setItem('mockup_history', updated);
+    toast('Design deleted');
+  };
+
+  const openInStudio = (design: MockupResult) => {
+    localStorage.setItem('edit_from_brand', JSON.stringify(design));
+    window.location.href = '/design';
+  };
+
+  const openTechPack = (design: MockupResult) => {
+    localStorage.setItem('techpack_from_design', JSON.stringify(design));
+    window.location.href = '/techpack';
+  };
+
+  const downloadDesign = (design: MockupResult) => {
+    const a = document.createElement('a');
+    a.href = design.mockupImage;
+    a.download = `${design.garmentType}-${design.id}.png`;
+    a.click();
+    toast.success('Downloaded');
+  };
+
   const copyEssay = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard');
@@ -60,16 +90,25 @@ export default function HistoryPage() {
     p.title.toLowerCase().includes(search.toLowerCase())
   ).reverse();
 
+  const filteredDesigns = designs.filter(d =>
+    d.garmentType.toLowerCase().includes(search.toLowerCase()) ||
+    d.description.toLowerCase().includes(search.toLowerCase())
+  ).reverse();
+
   return (
-    <motion.div className="mx-auto max-w-4xl" {...fadeInUp}>
+    <motion.div className="mx-auto max-w-5xl" {...fadeInUp}>
       <div className="mb-8 text-center">
         <h1 className="mb-2 text-3xl font-bold gradient-text inline-block">History</h1>
-        <p className="text-text-secondary">All your generated essays and presentations</p>
+        <p className="text-text-secondary">All your designs, essays, and presentations</p>
       </div>
 
       {/* Tabs + Search */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex rounded-lg border border-border overflow-hidden">
+          <button onClick={() => setTab('designs')}
+            className={`px-5 py-2 text-sm font-medium transition-colors ${tab === 'designs' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-bg-hover'}`}>
+            Designs ({designs.length})
+          </button>
           <button onClick={() => setTab('essays')}
             className={`px-5 py-2 text-sm font-medium transition-colors ${tab === 'essays' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-bg-hover'}`}>
             Essays ({essays.length})
@@ -87,6 +126,103 @@ export default function HistoryPage() {
           className="rounded-lg border border-border bg-bg-input px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-ring sm:w-64"
         />
       </div>
+
+      {/* Designs */}
+      {tab === 'designs' && (
+        filteredDesigns.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-12 text-center">
+            <svg className="mx-auto mb-3 h-10 w-10 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+            </svg>
+            <p className="text-sm text-text-primary font-medium mb-1">No designs generated yet</p>
+            <p className="text-xs text-text-muted">Go to the Design page to create your first garment.</p>
+          </div>
+        ) : (
+          <motion.div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" variants={staggerContainer} initial="initial" animate="animate">
+            {filteredDesigns.map((design) => (
+              <motion.div key={design.id} variants={staggerItem}
+                className="group rounded-xl border border-border bg-bg-card overflow-hidden cursor-pointer hover:border-accent/40 transition-colors"
+                style={{ boxShadow: 'var(--card-shadow)' }}
+                onClick={() => setSelectedDesign(design)}>
+                {design.mockupImage && (
+                  <div className="aspect-[3/4] overflow-hidden bg-bg-primary">
+                    <img src={design.mockupImage} alt={design.garmentType} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  </div>
+                )}
+                <div className="p-3">
+                  <span className="text-[10px] font-medium text-accent uppercase tracking-wider">{design.garmentType}</span>
+                  <p className="text-xs text-text-secondary line-clamp-2 mt-0.5">{design.description}</p>
+                  <p className="text-[10px] text-text-muted mt-1">{new Date(design.createdAt).toLocaleDateString()}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )
+      )}
+
+      {/* Design Detail Modal */}
+      <AnimatePresence>
+        {selectedDesign && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            onClick={() => setSelectedDesign(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-bg-card"
+              onClick={e => e.stopPropagation()}
+            >
+              {selectedDesign.mockupImage && (
+                <div className="relative aspect-square max-h-[50vh] overflow-hidden bg-bg-primary">
+                  <img src={selectedDesign.mockupImage} alt={selectedDesign.garmentType} className="h-full w-full object-contain" />
+                  <button
+                    onClick={() => setSelectedDesign(null)}
+                    className="absolute top-3 right-3 rounded-full bg-black/60 p-2 text-white/80 hover:bg-black/80 backdrop-blur-sm"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              )}
+              <div className="p-5">
+                <span className="text-xs font-medium text-accent uppercase tracking-wider">{selectedDesign.garmentType}</span>
+                <p className="mt-1 text-sm text-text-secondary leading-relaxed">{selectedDesign.description}</p>
+                {selectedDesign.specs && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    {selectedDesign.specs.fit && <div><span className="text-text-muted">Fit:</span> <span className="text-text-primary">{selectedDesign.specs.fit}</span></div>}
+                    {selectedDesign.specs.fabric && <div><span className="text-text-muted">Fabric:</span> <span className="text-text-primary">{selectedDesign.specs.fabric}</span></div>}
+                    {selectedDesign.specs.weight && <div><span className="text-text-muted">Weight:</span> <span className="text-text-primary">{selectedDesign.specs.weight}</span></div>}
+                    {selectedDesign.specs.colors?.length > 0 && <div><span className="text-text-muted">Colors:</span> <span className="text-text-primary">{selectedDesign.specs.colors.join(', ')}</span></div>}
+                  </div>
+                )}
+                <p className="mt-2 text-[10px] text-text-muted">{new Date(selectedDesign.createdAt).toLocaleDateString()}</p>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <button onClick={() => openInStudio(selectedDesign)} className="rounded-xl bg-white px-3 py-2.5 text-center text-xs font-bold text-black hover:shadow-lg transition-all">
+                    Edit in Studio
+                  </button>
+                  <button onClick={() => openTechPack(selectedDesign)} className="rounded-xl border border-border px-3 py-2.5 text-center text-xs font-semibold text-text-primary hover:bg-bg-hover transition-all">
+                    Tech Pack
+                  </button>
+                  <button onClick={() => downloadDesign(selectedDesign)} className="rounded-xl border border-border px-3 py-2.5 text-center text-xs font-semibold text-text-primary hover:bg-bg-hover transition-all">
+                    Download
+                  </button>
+                </div>
+                <button
+                  onClick={() => { deleteDesign(selectedDesign.id); setSelectedDesign(null); }}
+                  className="mt-2 w-full rounded-xl border border-red-500/20 px-3 py-2 text-center text-xs text-red-400 hover:bg-red-500/10 transition-all"
+                >
+                  Delete Design
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Essays */}
       {tab === 'essays' && (
