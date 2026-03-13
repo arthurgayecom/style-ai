@@ -749,10 +749,11 @@ export default function DesignPage() {
                   <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Quick Edits</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      'Make it oversized', 'Add a V-neck', 'Crop it shorter',
-                      'Add chest pocket', 'Change to heavyweight cotton',
-                      'Add double stitching', 'Remove the logo', 'Make sleeves longer',
-                      'Add ribbed cuffs', 'Switch to drop shoulders',
+                      'Make it more baggy/oversized', 'Remove the cuffs (open hem)',
+                      'Add side stripe panels', 'Change to heavyweight fleece',
+                      'Add contrast waistband', 'Remove all logos/branding',
+                      'Make the graphic bigger', 'Add cargo pockets',
+                      'Switch to dark wash', 'Make legs wider',
                     ].map(suggestion => (
                       <button
                         key={suggestion}

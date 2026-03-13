@@ -3,20 +3,21 @@ export type AppMode = 'school' | 'studio';
 
 // ── Garment Types ──
 export const GARMENT_TYPES = [
-  'T-Shirt', 'Hoodie', 'Sweatshirt', 'Pants', 'Jeans', 'Jacket',
-  'Dress', 'Skirt', 'Shorts', 'Cap', 'Tank Top', 'Polo', 'Blazer',
-  'Coat', 'Cargo Pants', 'Joggers', 'Windbreaker', 'Vest',
-  'Button-Down Shirt', 'Jumpsuit',
+  'Sweatpants', 'Joggers', 'Cargo Pants', 'Jeans', 'Pants', 'Shorts',
+  'Hoodie', 'Sweatshirt', 'T-Shirt', 'Jacket', 'Windbreaker', 'Vest',
+  'Tank Top', 'Polo', 'Button-Down Shirt', 'Blazer', 'Coat',
+  'Dress', 'Skirt', 'Jumpsuit', 'Cap',
 ] as const;
 
 export type GarmentType = typeof GARMENT_TYPES[number];
 
 // ── Part Labels for Mix & Match ──
 export const PART_LABELS = [
-  'collar', 'neckline', 'sleeves', 'cuffs', 'body', 'pocket',
-  'waistband', 'hem', 'zipper', 'hood', 'drawstring', 'lining',
-  'stitching', 'print/graphic', 'fabric/texture', 'silhouette',
-  'back panel', 'closure', 'ribbing', 'logo placement',
+  'silhouette', 'fabric/texture', 'waistband', 'hem', 'cuffs',
+  'pocket', 'drawstring', 'print/graphic', 'side panel/stripe',
+  'collar', 'neckline', 'sleeves', 'hood', 'zipper',
+  'body', 'lining', 'stitching', 'back panel', 'closure',
+  'ribbing', 'logo placement', 'belt/chain',
 ] as const;
 
 export type PartLabel = typeof PART_LABELS[number];

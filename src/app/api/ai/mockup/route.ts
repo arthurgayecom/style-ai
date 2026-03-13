@@ -104,7 +104,7 @@ async function tryAirforceModel(model: string, prompt: string, width: number, he
 }
 
 // ── Generate image: cascade through models from best to fastest ──
-async function generateImage(prompt: string, width = 1024, height = 1024): Promise<string> {
+async function generateImage(prompt: string, width = 832, height = 1216): Promise<string> {
   // Try each model in priority order on airforce API
   for (const model of IMAGE_MODELS) {
     const result = await tryAirforceModel(model, prompt, width, height);
@@ -172,8 +172,9 @@ async function handleQuestions(body: Record<string, unknown>) {
   const { garmentType, partsSummary, referenceImages } = body;
   const refs = referenceImages as Array<{ dataUrl: string; parts: string[]; notes: string }> | undefined;
 
-  const systemPrompt = `You are a professional fashion designer helping a client design a custom garment for manufacturing.
-Based on their reference images and part selections, generate 6-10 smart questions to nail down the exact design specifications.
+  const systemPrompt = `You are an expert streetwear fashion designer specializing in oversized/baggy garments. You're helping a client specify their custom design for manufacturing.
+
+Based on their reference images and selections, generate 6-10 precise questions. These questions will directly control the AI image generation, so they MUST capture the exact construction details.
 
 Return ONLY valid JSON (no markdown, no code fences):
 {
@@ -182,7 +183,7 @@ Return ONLY valid JSON (no markdown, no code fences):
       "id": "q1",
       "question": "What fit are you going for?",
       "type": "select",
-      "options": ["Slim fit", "Regular fit", "Relaxed fit", "Oversized", "Boxy"],
+      "options": ["Slim fit", "Regular fit", "Relaxed fit", "Oversized", "Ultra Baggy Wide-Leg"],
       "category": "fit"
     }
   ]
@@ -191,10 +192,14 @@ Return ONLY valid JSON (no markdown, no code fences):
 Rules:
 - "type" must be: "select" (single choice), "multi-select" (multiple), or "text" (free input)
 - "category" must be: "fit", "fabric", "construction", "color", "branding", or "details"
-- Questions should be specific to the garment type and reference images
-- Cover: fit/silhouette, fabric weight & feel, construction details (stitch type, seam style), color specifics, branding/logo, target use case
-- Make options practical and specific (not generic)
-- If they selected specific parts from images, ask about how those parts should be combined`;
+- Questions MUST be specific to what you SEE in the reference images
+- For pants/joggers always ask about: hem style (open vs cuffed), waistband style (single vs double, drawstring vs flat), leg width, pocket placement
+- For tops always ask about: shoulder drop, sleeve length, hem length, neckline
+- Include a question about fabric weight with GSM options (Lightweight 130-160, Midweight 180-220, Heavyweight 280-320, Premium 350+)
+- Include a question about what to AVOID / what should NOT be on the garment
+- If reference images show specific elements (graphics, stripes, panels, patterns), ask about those EXACT elements — don't generalize
+- Options must be practical streetwear terms (not generic fashion terms)
+- Always include "Ultra Baggy Wide-Leg" and "Oversized" as fit options for bottoms`;
 
   const userPrompt = `Garment type: ${garmentType}
 ${partsSummary ? `Parts selected from references: ${partsSummary}` : 'No specific parts selected — ask about general design preferences.'}
@@ -280,14 +285,48 @@ function extractConstraints(
           mustHave.push('screen-printed graphic');
         }
         // Detect fabric weight from answers
-        if (lower.includes('lightweight') && (lower.includes('gsm') || lower.includes('french terry') || lower.includes('loopback'))) {
-          mustHave.push('lightweight fabric');
+        if (lower.includes('lightweight') && (lower.includes('gsm') || lower.includes('french terry') || lower.includes('loopback') || lower.includes('130'))) {
+          mustHave.push('lightweight fabric 130-160 GSM');
         }
-        if (lower.includes('medium-weight') || lower.includes('midweight') || (lower.includes('medium') && lower.includes('weight'))) {
-          mustHave.push('midweight fabric');
+        if (lower.includes('medium-weight') || lower.includes('midweight') || (lower.includes('medium') && lower.includes('weight')) || lower.includes('180-220')) {
+          mustHave.push('midweight fabric 180-220 GSM');
         }
-        if (lower.includes('heavyweight') || lower.includes('heavy weight') || (lower.includes('heavy') && lower.includes('fleece'))) {
-          mustHave.push('heavyweight fabric');
+        if ((lower.includes('heavyweight') || lower.includes('heavy weight') || (lower.includes('heavy') && lower.includes('fleece')) || lower.includes('280-320')) && !lower.includes('premium')) {
+          mustHave.push('heavyweight fabric 280-320 GSM');
+        }
+        if (lower.includes('premium') && (lower.includes('heavyweight') || lower.includes('350'))) {
+          mustHave.push('premium heavyweight fabric 350+ GSM');
+        }
+        // Detect waistband style from answers
+        if (lower.includes('double elastic') || lower.includes('double waistband')) {
+          mustHave.push('double elastic waistband');
+        }
+        if (lower.includes('contrast fabric waistband') || lower.includes('plaid waistband') || lower.includes('tartan')) {
+          mustHave.push('contrast fabric waistband (plaid/tartan)');
+        }
+        // Detect material composition
+        if (lower.includes('french terry')) mustHave.push('French terry fabric');
+        if (lower.includes('fleece') && !lower.includes('french')) mustHave.push('fleece fabric');
+        if (lower.includes('ripstop') || lower.includes('nylon')) mustHave.push('ripstop nylon fabric');
+        if (lower.includes('denim') || lower.includes('heavy denim')) mustHave.push('heavyweight denim fabric');
+        if (lower.includes('canvas') || lower.includes('twill')) mustHave.push('cotton twill/canvas fabric');
+        // Detect hem styles from new questions
+        if (lower.includes('dragging') || lower.includes('pooling')) {
+          mustHave.push('hem pooling/dragging on ground');
+        }
+        if (lower.includes('raw frayed') || lower.includes('frayed edge')) {
+          mustHave.push('raw frayed hem edge');
+        }
+        if (lower.includes('drawstring ankle') || lower.includes('ankle toggle')) {
+          mustHave.push('drawstring ankle toggles');
+        }
+        // Detect pocket styles
+        if (lower.includes('cargo pockets')) mustHave.push('cargo pockets on thighs');
+        if (lower.includes('deep slant')) mustHave.push('deep slant pockets');
+        // Detect avoid question (questionId might be "avoid")
+        if (a.questionId === 'avoid' && typeof a.answer === 'string' && a.answer.trim()) {
+          const avoidItems = a.answer.split(',').map(s => s.trim()).filter(Boolean);
+          mustNot.push(...avoidItems);
         }
       }
     }
@@ -444,29 +483,35 @@ async function handleGenerate(body: Record<string, unknown>) {
       }
     }
 
-    const systemPrompt = `You are a fashion design AI that creates image generation prompts. Your #1 priority is FAITHFULLY reproducing what the user asked for. You NEVER add, change, or ignore design details.
+    const systemPrompt = `You are an expert streetwear fashion designer creating image generation prompts for FLUX AI. You deeply understand oversized/baggy aesthetics: ultra-wide legs, dropped crotch, open hems that pool on the ground, contrast waistbands, side stripe panels, heavyweight fabrics with natural drape.
 
-CRITICAL RULES for the imagePrompt:
-- Keep it UNDER 200 words
-- The FIRST 30 words MUST contain the core silhouette, fit, and hem/cuff style
-- Every MUST HAVE constraint below MUST appear word-for-word in your imagePrompt
-- Every MUST NOT constraint below MUST appear as "no [item]" in your imagePrompt
-- If the user says "no cuffs" you MUST write "open straight-cut hem at ankles, absolutely no elastic cuffs, no ribbed cuffs"
-- If the user says "baggy" or "oversized" you MUST write "ultra baggy oversized wide-leg" in the first line
-- If the user says "full-size graphic" you MUST write "large full-length graphic covering most of the leg"
-- If reference images show a specific graphic (like an AK-47), describe it exactly — don't minimize or change it
-- If the user wants "same fit as reference image", study the reference images closely and describe the EXACT silhouette, proportions, and fit you see — match it precisely
-- If a fabric weight is specified (e.g. "heavyweight 280-320 GSM"), include it in the imagePrompt
-- Do NOT add design elements the user didn't ask for (no extra pockets, logos, patterns, or embellishments)
-- Do NOT change the silhouette (if user says baggy, do NOT make it slim or tapered)
-- End with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."
+Your ONLY job: faithfully translate the user's design specs + reference images into a precise FLUX image prompt. You NEVER add, change, or ignore details.
+
+=== PROMPT STRUCTURE (follow this EXACT order) ===
+1. FIRST 30 WORDS: Core silhouette + fit + hem style (e.g., "ultra baggy oversized wide-leg heather grey sweatpants with open straight-cut hem pooling at ankles")
+2. NEXT: Construction details — waistband, pockets, panels, stripes, graphics
+3. NEXT: Fabric + weight + color specifics
+4. NEXT: What's NOT on the garment (every MUST NOT becomes "no [item]")
+5. LAST LINE ALWAYS: "Professional fashion product photo on model, studio lighting, clean background, high-end streetwear lookbook, 8k sharp detail"
+
+=== HARD RULES ===
+- UNDER 200 words total
+- If user says "no cuffs" → write "open straight-cut hem at ankles, absolutely no elastic cuffs, no ribbed cuffs, no jogger cuffs"
+- If user says "baggy/oversized" → write "ultra baggy oversized wide-leg with extreme volume" as first words
+- If user says "full-size graphic" → write "large full-length graphic covering entire leg from thigh to ankle"
+- If reference images show a specific design element (graphic, waistband, panel), describe it EXACTLY as it appears — never minimize or reinterpret
+- If user wants "same fit as reference" → study the reference closely and describe the EXACT proportions, width ratio, drop-crotch depth, and leg taper you see
+- Include fabric weight when specified (e.g., "heavyweight 320 GSM French terry")
+- NEVER add elements the user didn't request (no extra pockets, logos, patterns, stripes, embellishments)
+- NEVER change the silhouette — if user says wide-leg, you CANNOT output slim, tapered, or fitted
+- Describe the garment ON A MODEL wearing sneakers (not flat-lay) for better AI understanding of fit and drape
 ${constraintBlock}
 ${prefBlock}
 
 Return ONLY valid JSON (no markdown):
 {
-  "imagePrompt": "FLUX-optimized prompt with ALL mandatory constraints included",
-  "description": "2-3 sentence fashion description matching exactly what user requested",
+  "imagePrompt": "...",
+  "description": "2-3 sentence fashion description matching EXACTLY what user requested",
   "specs": {"fit":"...","fabric":"...","weight":"...","colors":["..."],"keyFeatures":["..."]}
 }`;
 
@@ -561,26 +606,26 @@ async function handleEdit(body: Record<string, unknown>) {
       if (parts.length > 0) specsContext = '\nCurrent specs: ' + parts.join(' | ');
     }
 
-    const systemPrompt = `You are editing an existing ${garmentType} design. I'm showing you the CURRENT design image. The user wants to make a SMALL, SPECIFIC change — NOT a full redesign.
+    const systemPrompt = `You are editing an existing ${garmentType} design. The attached image shows the CURRENT design. The user wants ONE specific change — NOT a redesign.
 
 CURRENT DESIGN:
 - Description: "${prevDesc || 'no description'}"${specsContext}
 
-USER'S EDIT REQUEST: "${editInstructions}"
+USER'S EDIT: "${editInstructions}"
 
-CRITICAL RULES:
-- Look at the attached image — that is the CURRENT design
-- ONLY change what the user specifically asked to change
-- Keep EVERYTHING ELSE exactly the same (same silhouette, same color, same fabric, same graphics, same fit)
-- Your imagePrompt must describe the FULL garment (current design + the requested change applied)
-- Keep it UNDER 200 words
-- Be extremely detailed about the parts that should stay the same — describe them as they appear in the current image
-- End with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."
+RULES:
+- Study the attached image carefully — that is the garment you're modifying
+- Apply ONLY the user's requested change
+- Keep EVERYTHING ELSE identical: same silhouette, color, fabric, graphics, fit, width, hem style, waistband, pockets, stripes
+- Your imagePrompt describes the FULL garment (current design + edit applied) ON A MODEL
+- Be extremely specific about preserved elements — describe colors, materials, and construction exactly as they appear
+- Keep under 200 words
+- End with: "Professional fashion product photo on model, studio lighting, clean background, high-end streetwear lookbook, 8k sharp detail"
 ${constraintBlock}
 ${prefBlock}
 
 Return ONLY valid JSON:
-{"imagePrompt":"full garment description with edit applied, everything else preserved","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}`;
+{"imagePrompt":"full garment on model with edit applied, everything else exactly preserved","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}`;
 
     // Build content parts — include the current design image so Gemini can SEE it
     const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
@@ -621,14 +666,27 @@ Return ONLY valid JSON:
 
 // ── Fallback questions if AI fails ──
 function getDefaultQuestions(garmentType: string) {
+  const isBottom = /pant|jean|jogger|cargo|short|trouser/i.test(garmentType);
+  if (isBottom) {
+    return [
+      { id: 'fit', question: `What silhouette for this ${garmentType}?`, type: 'select', options: ['Ultra Baggy Wide-Leg', 'Oversized Relaxed', 'Regular Straight', 'Slim Tapered'], category: 'fit' },
+      { id: 'hem', question: 'Hem / ankle style?', type: 'select', options: ['Open Hem (straight, uncuffed, dragging)', 'Elastic Ribbed Cuffs', 'Drawstring Ankle Toggle', 'Raw Frayed Edge'], category: 'construction' },
+      { id: 'waistband', question: 'Waistband style?', type: 'select', options: ['Elastic with External Drawstring', 'Double Elastic Waistband', 'Flat Waistband with Belt Loops', 'Contrast Fabric Waistband (e.g., plaid)'], category: 'construction' },
+      { id: 'fabric', question: 'Fabric weight?', type: 'select', options: ['Lightweight (130-160 GSM)', 'Midweight (180-220 GSM)', 'Heavyweight (280-320 GSM)', 'Premium Heavyweight (350+ GSM)'], category: 'fabric' },
+      { id: 'material', question: 'Material?', type: 'select', options: ['100% Cotton Fleece', '60/40 Cotton Polyester', 'French Terry', 'Heavy Denim', 'Cotton Twill / Canvas', 'Ripstop Nylon'], category: 'fabric' },
+      { id: 'pockets', question: 'Pocket style?', type: 'select', options: ['Side Seam Pockets Only', 'Deep Slant Pockets', 'Cargo Pockets on Thighs', 'No Visible Pockets'], category: 'construction' },
+      { id: 'color', question: 'Primary color?', type: 'text', category: 'color' },
+      { id: 'avoid', question: 'What should this garment NOT have?', type: 'text', category: 'details' },
+    ];
+  }
   return [
-    { id: 'fit', question: `What fit do you want for this ${garmentType}?`, type: 'select', options: ['Slim fit', 'Regular fit', 'Relaxed fit', 'Oversized', 'Boxy/streetwear'], category: 'fit' },
-    { id: 'fabric', question: 'What fabric weight and feel?', type: 'select', options: ['Lightweight (130-160 GSM)', 'Midweight (180-220 GSM)', 'Heavyweight (250-320 GSM)', 'Premium heavyweight (350+ GSM)'], category: 'fabric' },
-    { id: 'material', question: 'Preferred material composition?', type: 'select', options: ['100% Cotton', '100% Organic Cotton', 'Cotton/Polyester blend', 'French Terry', 'Fleece', 'Jersey knit'], category: 'fabric' },
-    { id: 'neckline', question: 'Neckline style?', type: 'select', options: ['Crew neck', 'V-neck', 'Scoop neck', 'Mock neck', 'Henley', 'Collar'], category: 'construction' },
-    { id: 'stitch', question: 'What stitching style?', type: 'select', options: ['Standard single-needle', 'Double-needle (durable)', 'Flatlock (athletic)', 'Contrast stitching', 'Topstitching detail'], category: 'construction' },
+    { id: 'fit', question: `What fit for this ${garmentType}?`, type: 'select', options: ['Ultra Oversized / Boxy', 'Oversized Drop Shoulder', 'Regular Fit', 'Slim Fit', 'Cropped Boxy'], category: 'fit' },
+    { id: 'fabric', question: 'Fabric weight?', type: 'select', options: ['Lightweight (130-160 GSM)', 'Midweight (180-220 GSM)', 'Heavyweight (280-320 GSM)', 'Premium Heavyweight (350+ GSM)'], category: 'fabric' },
+    { id: 'material', question: 'Material?', type: 'select', options: ['100% Cotton', '100% Organic Cotton', 'Cotton/Polyester Blend', 'French Terry', 'Fleece', 'Nylon Shell', 'Denim'], category: 'fabric' },
+    { id: 'neckline', question: 'Neckline / collar?', type: 'select', options: ['Crew Neck', 'V-Neck', 'Hoodie', 'Mock Neck / Turtleneck', 'Zip-Up Collar', 'No Collar (jacket)'], category: 'construction' },
     { id: 'color', question: 'Primary color palette?', type: 'text', category: 'color' },
-    { id: 'branding', question: 'Any branding or logo placement?', type: 'select', options: ['No branding', 'Small chest logo', 'Large front graphic', 'Back print', 'Embroidered label', 'Woven neck label only'], category: 'branding' },
-    { id: 'details', question: 'Any special construction details?', type: 'multi-select', options: ['Ribbed cuffs', 'Split hem', 'Side slits', 'Drop shoulders', 'Raglan sleeves', 'Raw edge hem', 'Taped seams', 'Hidden pockets'], category: 'details' },
+    { id: 'branding', question: 'Branding / graphics?', type: 'select', options: ['No Branding (clean)', 'Small Chest Logo', 'Large Front Graphic', 'Large Back Print', 'Embroidered Script', 'All-Over Pattern'], category: 'branding' },
+    { id: 'details', question: 'Construction details?', type: 'multi-select', options: ['Drop Shoulders', 'Extended Sleeves (covers hands)', 'Raw Edge Hem', 'Split Hem', 'Double-Needle Stitching', 'Contrast Stitching', 'Kangaroo Pocket', 'Hidden Pockets'], category: 'details' },
+    { id: 'avoid', question: 'What should this garment NOT have?', type: 'text', category: 'details' },
   ];
 }
