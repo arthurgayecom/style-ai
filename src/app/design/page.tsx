@@ -23,6 +23,8 @@ export default function DesignPage() {
   // Wizard
   const [step, setStep] = useState<DesignStep>('upload');
   const [garmentType, setGarmentType] = useState('T-Shirt');
+  const [detecting, setDetecting] = useState(false);
+  const [autoDetected, setAutoDetected] = useState(false);
 
   // Step 1: References
   const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -80,6 +82,47 @@ export default function DesignPage() {
   const [history, setHistory] = useState<MockupResult[]>(() => getItem('mockup_history', []));
   const [showHistory, setShowHistory] = useState(false);
 
+  // Template browser (VASTE collection as mockup bases)
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; garmentType: string; name: string; image: string; description: string }[]>([]);
+  const [templateFilter, setTemplateFilter] = useState('all');
+  const templatesLoaded = useRef(false);
+
+  const loadTemplates = useCallback(() => {
+    if (templatesLoaded.current) { setShowTemplates(true); return; }
+    fetch('/brand/vaste/collection.json')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setTemplates(data); templatesLoaded.current = true; setShowTemplates(true); })
+      .catch(() => setTemplates([]));
+  }, []);
+
+  const addTemplateAsRef = useCallback(async (tpl: { image: string; garmentType: string; name: string }) => {
+    // Fetch the template image and convert to data URL
+    try {
+      const res = await fetch(tpl.image);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setReferences(prev => {
+          if (prev.length >= MAX_IMAGES) return prev;
+          return [...prev, {
+            id: `ref-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            dataUrl,
+            filename: tpl.name,
+            parts: [],
+            notes: '',
+          }];
+        });
+        setGarmentType(tpl.garmentType);
+        setAutoDetected(true);
+        setShowTemplates(false);
+      };
+      reader.readAsDataURL(blob);
+    } catch { /* ignore fetch errors */ }
+  }, []);
+
   // Design Preferences (persisted to localStorage)
   const [showPrefs, setShowPrefs] = useState(false);
   const [preferences, setPreferences] = useState<Record<string, string>>(() =>
@@ -119,25 +162,51 @@ export default function DesignPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Auto-detect garment type from image ──
+  const detectGarmentType = useCallback(async (dataUrl: string) => {
+    if (autoDetected) return; // only auto-detect once per session
+    setDetecting(true);
+    try {
+      const res = await fetch('/api/ai/mockup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'detect', image: dataUrl }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.garmentType && data.confidence > 0.3) {
+          setGarmentType(data.garmentType);
+          setAutoDetected(true);
+        }
+      }
+    } catch { /* detection is best-effort */ }
+    setDetecting(false);
+  }, [autoDetected]);
+
   // ── Step 1: Upload References ──
   const addImages = useCallback((files: FileList | File[]) => {
     const fileArr = Array.from(files);
+    let isFirst = references.length === 0;
     for (const file of fileArr) {
       if (references.length >= MAX_IMAGES) break;
       if (!file.type.startsWith('image/')) continue;
       if (file.size > MAX_FILE_SIZE) { setError(`"${file.name}" is too large (max 5MB)`); continue; }
       const reader = new FileReader();
+      const shouldDetect = isFirst;
+      isFirst = false;
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
         setReferences(prev => {
           if (prev.length >= MAX_IMAGES) return prev;
           return [...prev, { id: `ref-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, dataUrl, filename: file.name, parts: [], notes: '' }];
         });
+        // Auto-detect garment type from the first uploaded image
+        if (shouldDetect) detectGarmentType(dataUrl);
       };
       reader.readAsDataURL(file);
     }
     setError('');
-  }, [references.length]);
+  }, [references.length, detectGarmentType]);
 
   const removeRef = (id: string) => setReferences(prev => prev.filter(r => r.id !== id));
 
@@ -385,12 +454,23 @@ export default function DesignPage() {
       {/* Garment Type Selector (always visible except review) */}
       {step !== 'review' && step !== 'generate' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-          <label className="mb-2 block text-xs font-bold text-text-secondary uppercase tracking-wider">Garment Type</label>
+          <div className="mb-2 flex items-center gap-2">
+            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider">Garment Type</label>
+            {detecting && (
+              <span className="flex items-center gap-1.5 text-[10px] text-purple-400 animate-pulse">
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                Auto-detecting...
+              </span>
+            )}
+            {autoDetected && !detecting && (
+              <span className="text-[10px] text-green-400">Auto-detected</span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {GARMENT_TYPES.map(type => (
               <button
                 key={type}
-                onClick={() => setGarmentType(type)}
+                onClick={() => { setGarmentType(type); setAutoDetected(false); }}
                 className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all ${
                   garmentType === type
                     ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
@@ -535,6 +615,69 @@ export default function DesignPage() {
                 <p className="mt-1 text-xs text-text-muted/50">Up to {MAX_IMAGES} images, 5MB each</p>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && addImages(e.target.files)} />
               </div>
+
+              {/* Template browser toggle */}
+              <div className="mt-3 flex items-center justify-center">
+                <button
+                  onClick={loadTemplates}
+                  className="flex items-center gap-1.5 text-xs font-medium text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                  Or browse free mockup templates
+                </button>
+              </div>
+
+              {/* Template browser panel */}
+              <AnimatePresence>
+                {showTemplates && templates.length > 0 && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-text-primary">VASTE Templates</h3>
+                        <button onClick={() => setShowTemplates(false)} className="text-xs text-text-muted hover:text-text-secondary">Close</button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {['all', 'sweatpants', 'jeans', 'cargo', 'jacket', 'hoodie', 't-shirt', 'shorts'].map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setTemplateFilter(cat)}
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-all ${
+                              templateFilter === cat
+                                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+                                : 'border border-border text-text-muted hover:text-text-secondary'
+                            }`}
+                          >
+                            {cat === 'all' ? 'All' : cat === 't-shirt' ? 'Tees' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-[280px] overflow-y-auto">
+                        {templates
+                          .filter(t => templateFilter === 'all' || t.garmentType.toLowerCase().includes(templateFilter))
+                          .map(tpl => (
+                            <button
+                              key={tpl.id}
+                              onClick={() => addTemplateAsRef(tpl)}
+                              className="group relative overflow-hidden rounded-lg border border-border aspect-[3/4] hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/10"
+                            >
+                              <img src={`${tpl.image}?v=1`} alt={tpl.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="absolute bottom-1 inset-x-1 text-[8px] text-white font-medium truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                                {tpl.name}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                      <p className="mt-2 text-[10px] text-text-muted/60">Click a template to use it as your starting reference. Garment type will auto-set.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {references.length > 0 && (
                 <div className="mt-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">

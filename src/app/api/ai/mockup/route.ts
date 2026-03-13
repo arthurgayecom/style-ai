@@ -216,14 +216,74 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { mode } = body;
 
+    if (mode === 'detect') return handleDetect(body);
     if (mode === 'questions') return handleQuestions(body);
     if (mode === 'generate') return handleGenerate(body);
     if (mode === 'edit') return handleEdit(body);
 
-    return NextResponse.json({ error: 'Invalid mode. Use: questions, generate, or edit.' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid mode. Use: detect, questions, generate, or edit.' }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Design generation failed';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// ═══════ MODE: DETECT ═══════
+async function handleDetect(body: Record<string, unknown>) {
+  const { image } = body;
+  if (!image || typeof image !== 'string') {
+    return NextResponse.json({ error: 'Image is required for detection.' }, { status: 400 });
+  }
+
+  const img = parseImage(image);
+  if (!img) {
+    return NextResponse.json({ error: 'Invalid image format.' }, { status: 400 });
+  }
+
+  const validTypes = [
+    'Sweatpants', 'Joggers', 'Cargo Pants', 'Jeans', 'Pants', 'Shorts',
+    'Hoodie', 'Sweatshirt', 'T-Shirt', 'Jacket', 'Windbreaker', 'Vest',
+    'Tank Top', 'Polo', 'Button-Down Shirt', 'Blazer', 'Coat',
+    'Dress', 'Skirt', 'Jumpsuit', 'Cap',
+  ];
+
+  const systemPrompt = `You are a garment classification expert. Analyze the image and determine what type of clothing item it shows.
+
+Valid garment types (pick EXACTLY one): ${validTypes.join(', ')}
+
+Rules:
+- If the image shows a full outfit, identify the PRIMARY/main garment that stands out most
+- If it shows pants with cargo pockets, classify as "Cargo Pants"
+- If it shows athletic/fleece pants, classify as "Sweatpants" or "Joggers"
+- If it shows a zip-up hoodie or pullover hoodie, classify as "Hoodie"
+- If it shows a crewneck sweatshirt (no hood), classify as "Sweatshirt"
+- If it shows a puffer vest or utility vest, classify as "Vest"
+- Be specific — don't default to generic "Pants" when a more specific type applies
+
+Return ONLY valid JSON (no markdown): {"garmentType": "exact type from list", "confidence": 0.95}`;
+
+  try {
+    const data = await callGemini([{
+      role: 'user',
+      parts: [
+        { inlineData: img },
+        { text: 'What type of garment is shown in this image? Classify it.' },
+      ],
+    }], systemPrompt);
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const parsed = parseAIJSON(text) as { garmentType?: string; confidence?: number };
+
+    // Validate the returned type is in our list
+    const detected = parsed.garmentType || 'T-Shirt';
+    const isValid = validTypes.some(t => t.toLowerCase() === detected.toLowerCase());
+
+    return NextResponse.json({
+      garmentType: isValid ? detected : 'T-Shirt',
+      confidence: parsed.confidence ?? 0.5,
+    });
+  } catch {
+    return NextResponse.json({ garmentType: 'T-Shirt', confidence: 0 });
   }
 }
 
