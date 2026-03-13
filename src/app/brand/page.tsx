@@ -36,27 +36,27 @@ export default function BrandPage() {
     { key: 'hoodie', label: 'Hoodies' },
     { key: 't-shirt', label: 'Tees' },
     { key: 'shorts', label: 'Shorts' },
-    { key: 'accessories', label: 'Accessories' },
   ];
-
-  const isAccessory = (d: BrandDesign) =>
-    d.id.startsWith('AC') ||
-    /chain|d-ring|carabiner|grommet|eyelet/i.test(d.description || '') ||
-    /chain|d-ring|carabiner|grommet|eyelet/i.test(d.instructions || '');
 
   const filtered = filter === 'all'
     ? designs
-    : filter === 'accessories'
-      ? designs.filter(isAccessory)
-      : designs.filter(d => d.garmentType.toLowerCase().includes(filter));
+    : designs.filter(d => d.garmentType.toLowerCase().includes(filter));
 
   const categoryCount = (key: string) =>
     key === 'all' ? designs.length
-    : key === 'accessories' ? designs.filter(isAccessory).length
     : designs.filter(d => d.garmentType.toLowerCase().includes(key)).length;
 
+  // Sort by category for consistent display order
+  const typeOrder: Record<string, number> = { 'Sweatpants': 0, 'Jeans': 1, 'Cargo Pants': 2, 'Jacket': 3, 'Hoodie': 4, 'T-Shirt': 5, 'Shorts': 6 };
+  const sorted = [...filtered].sort((a, b) => {
+    const ta = typeOrder[a.garmentType] ?? 99;
+    const tb = typeOrder[b.garmentType] ?? 99;
+    if (ta !== tb) return ta - tb;
+    return a.id.localeCompare(b.id);
+  });
+
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-7xl pb-24">
       {/* Hero / Brand Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -144,7 +144,7 @@ export default function BrandPage() {
           animate={{ opacity: 1 }}
           className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
         >
-          {filtered.map((design) => (
+          {sorted.map((design) => (
             <div
               key={design.id}
               onClick={() => setSelected(design)}
