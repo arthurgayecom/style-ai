@@ -494,7 +494,7 @@ Return ONLY valid JSON (no markdown):
 // ═══════ MODE: EDIT ═══════
 async function handleEdit(body: Record<string, unknown>) {
   try {
-    const { editInstructions, garmentType, description: prevDesc } = body;
+    const { editInstructions, garmentType, description: prevDesc, mockupImage: currentImage, specs: prevSpecs } = body;
 
     if (!editInstructions) {
       return NextResponse.json({ error: 'Edit instructions are required.' }, { status: 400 });
@@ -525,32 +525,49 @@ async function handleEdit(body: Record<string, unknown>) {
       }
     }
 
-    const systemPrompt = `You are editing an existing ${garmentType} design for a FLUX image generation model.
-The previous design was: "${prevDesc || 'no description'}".
-The user wants to: "${editInstructions}".
+    // Build specs context so Gemini knows the full current design
+    let specsContext = '';
+    if (prevSpecs && typeof prevSpecs === 'object') {
+      const s = prevSpecs as Record<string, unknown>;
+      const parts: string[] = [];
+      if (s.fit) parts.push(`Fit: ${s.fit}`);
+      if (s.fabric) parts.push(`Fabric: ${s.fabric}`);
+      if (s.weight) parts.push(`Weight: ${s.weight}`);
+      if (Array.isArray(s.colors) && s.colors.length > 0) parts.push(`Colors: ${s.colors.join(', ')}`);
+      if (Array.isArray(s.keyFeatures) && s.keyFeatures.length > 0) parts.push(`Key features: ${s.keyFeatures.join(', ')}`);
+      if (parts.length > 0) specsContext = '\nCurrent specs: ' + parts.join(' | ');
+    }
 
-Your #1 priority is FAITHFULLY applying the user's edit. Do NOT ignore any instruction.
+    const systemPrompt = `You are editing an existing ${garmentType} design. I'm showing you the CURRENT design image. The user wants to make a SMALL, SPECIFIC change — NOT a full redesign.
+
+CURRENT DESIGN:
+- Description: "${prevDesc || 'no description'}"${specsContext}
+
+USER'S EDIT REQUEST: "${editInstructions}"
 
 CRITICAL RULES:
-- Keep the imagePrompt UNDER 200 words
-- Put the most important structural details FIRST (silhouette, fit, hem/cuff style)
-- Be explicit about what the garment DOES and DOES NOT have
-- If user says "no cuffs" → write "open straight-cut hem, absolutely no elastic cuffs"
-- If user says "baggy" → write "ultra baggy oversized wide-leg"
-- Do NOT add elements the user didn't ask for
-- Do NOT change elements the user didn't mention changing
+- Look at the attached image — that is the CURRENT design
+- ONLY change what the user specifically asked to change
+- Keep EVERYTHING ELSE exactly the same (same silhouette, same color, same fabric, same graphics, same fit)
+- Your imagePrompt must describe the FULL garment (current design + the requested change applied)
+- Keep it UNDER 200 words
+- Be extremely detailed about the parts that should stay the same — describe them as they appear in the current image
+- End with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."
 ${constraintBlock}
 ${prefBlock}
 
 Return ONLY valid JSON:
-{"imagePrompt":"full updated garment description","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}
+{"imagePrompt":"full garment description with edit applied, everything else preserved","description":"2-3 sentences","specs":{"fit":"...","fabric":"...","weight":"...","colors":[...],"keyFeatures":[...]}}`;
 
-End imagePrompt with: "Professional flat-lay product photo on clean white background, studio lighting, fashion e-commerce style."`;
+    // Build content parts — include the current design image so Gemini can SEE it
+    const contentParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+    if (typeof currentImage === 'string') {
+      const img = parseImage(currentImage);
+      if (img) contentParts.push({ inlineData: img });
+    }
+    contentParts.push({ text: `Edit request: ${editInstructions}` });
 
-    const data = await callGemini([{
-      role: 'user',
-      parts: [{ text: `Edit request: ${editInstructions}` }],
-    }], systemPrompt);
+    const data = await callGemini([{ role: 'user', parts: contentParts }], systemPrompt);
 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     let imagePrompt = '';

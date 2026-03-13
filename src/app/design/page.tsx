@@ -47,6 +47,22 @@ export default function DesignPage() {
   const [history, setHistory] = useState<MockupResult[]>(() => getItem('mockup_history', []));
   const [showHistory, setShowHistory] = useState(false);
 
+  // Design Preferences (persisted to localStorage)
+  const [showPrefs, setShowPrefs] = useState(false);
+  const [preferences, setPreferences] = useState<Record<string, string>>(() =>
+    getItem('design_preferences', {
+      fit: '',
+      hemStyle: '',
+      aesthetic: '',
+      avoid: '',
+    })
+  );
+  const updatePref = (key: string, value: string) => {
+    const next = { ...preferences, [key]: value };
+    setPreferences(next);
+    setItem('design_preferences', next);
+  };
+
   // ── Step 1: Upload References ──
   const addImages = useCallback((files: FileList | File[]) => {
     const fileArr = Array.from(files);
@@ -129,6 +145,9 @@ export default function DesignPage() {
     setResult(null);
 
     try {
+      const activePrefs = Object.fromEntries(
+        Object.entries(preferences).filter(([, v]) => v && v.trim())
+      );
       const res = await fetch('/api/ai/mockup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -139,6 +158,7 @@ export default function DesignPage() {
           answers,
           instructions: extraInstructions,
           quality: 'high',
+          preferences: Object.keys(activePrefs).length > 0 ? activePrefs : undefined,
         }),
       });
       const data = await res.json();
@@ -173,6 +193,9 @@ export default function DesignPage() {
     setError('');
 
     try {
+      const activePrefs = Object.fromEntries(
+        Object.entries(preferences).filter(([, v]) => v && v.trim())
+      );
       const res = await fetch('/api/ai/mockup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,6 +204,9 @@ export default function DesignPage() {
           mockupImage: result.mockupImage,
           editInstructions: editText,
           garmentType,
+          description: result.description,
+          specs: result.specs,
+          preferences: Object.keys(activePrefs).length > 0 ? activePrefs : undefined,
         }),
       });
       const data = await res.json();
@@ -300,6 +326,90 @@ export default function DesignPage() {
               </button>
             ))}
           </div>
+        </motion.div>
+      )}
+
+      {/* Design Preferences (collapsible) */}
+      {step !== 'review' && step !== 'generate' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
+          <button
+            onClick={() => setShowPrefs(!showPrefs)}
+            className="flex items-center gap-2 text-xs font-semibold text-text-muted hover:text-text-secondary transition-colors"
+          >
+            <svg className={`h-3 w-3 transition-transform ${showPrefs ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+            Style Preferences
+            {Object.values(preferences).some(v => v.trim()) && (
+              <span className="rounded-full bg-purple-500/20 px-1.5 py-0.5 text-[9px] text-purple-400">Active</span>
+            )}
+          </button>
+          <AnimatePresence>
+            {showPrefs && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Default Fit</label>
+                    <select
+                      value={preferences.fit || ''}
+                      onChange={(e) => updatePref('fit', e.target.value)}
+                      className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
+                    >
+                      <option value="">Not set</option>
+                      <option value="Ultra baggy oversized wide-leg">Ultra Baggy / Oversized</option>
+                      <option value="Relaxed oversized">Relaxed Oversized</option>
+                      <option value="Regular fit">Regular Fit</option>
+                      <option value="Slim fit">Slim Fit</option>
+                      <option value="Boxy cropped">Boxy / Cropped</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Hem / Cuffs</label>
+                    <select
+                      value={preferences.hemStyle || ''}
+                      onChange={(e) => updatePref('hemStyle', e.target.value)}
+                      className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
+                    >
+                      <option value="">Not set</option>
+                      <option value="Open straight-cut hem, NO elastic cuffs">Open / Straight Cut (No Cuffs)</option>
+                      <option value="Elastic ribbed cuffs at ankles">Elastic Ribbed Cuffs</option>
+                      <option value="Raw edge hem">Raw Edge</option>
+                      <option value="Split hem">Split Hem</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Aesthetic</label>
+                    <select
+                      value={preferences.aesthetic || ''}
+                      onChange={(e) => updatePref('aesthetic', e.target.value)}
+                      className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary focus:border-purple-400 focus:outline-none"
+                    >
+                      <option value="">Not set</option>
+                      <option value="Streetwear, oversized silhouettes, bold graphics">Streetwear</option>
+                      <option value="Minimalist clean, no logos, muted tones">Minimalist</option>
+                      <option value="Vintage retro washed distressed">Vintage / Retro</option>
+                      <option value="Luxury high-end premium fabrics">Luxury</option>
+                      <option value="Athletic sportswear performance">Athletic</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold text-text-muted uppercase tracking-wider">Always Avoid</label>
+                    <input
+                      type="text"
+                      value={preferences.avoid || ''}
+                      onChange={(e) => updatePref('avoid', e.target.value)}
+                      placeholder="e.g., elastic cuffs, logos, slim fit..."
+                      className="w-full rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted/40 focus:border-purple-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] text-text-muted/50">These preferences apply to every generation and override AI defaults.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
 
